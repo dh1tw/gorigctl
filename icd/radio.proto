@@ -1,0 +1,232 @@
+syntax = "proto3";
+
+package shackbus.radio;
+
+message State{  // Rig State
+    string current_vfo = 1;
+    Vfo vfo = 2;
+    Channel channel = 3;
+    bool radio_on = 4;
+    bool ptt = 5;
+    int32 polling_interval = 6; // ms
+}
+
+message SetState{
+    string current_vfo = 1;
+    Vfo vfo = 2;
+    Channel channel = 3;
+    repeated string vfo_operations = 4;
+    bool radio_on = 5;
+    bool ptt = 6;
+    MetaData md = 7;
+    int32 polling_interval = 8;
+    string user_id = 9;
+}
+
+message Capabilities{
+    repeated string vfos = 1;
+    repeated string modes = 2;
+    repeated string vfo_ops = 3;    
+    repeated string get_functions = 4;
+    repeated string set_functions = 5;
+    repeated Value get_levels = 6;
+    repeated Value set_levels = 7;
+    repeated Value get_parameters = 8;
+    repeated Value set_parameters = 9;
+    int32 max_rit = 10;
+    int32 max_xit = 11;
+    int32 max_if_shift = 12;
+    map<string, Int32List> filters = 13;
+    map<string, Int32List> tuning_steps = 14;
+    repeated int32 preamps = 15;
+    repeated int32 attenuators = 16;
+    int32 rig_model = 17;
+    string model_name = 18;
+    string version = 19;
+    string mfg_name = 20;
+    string status = 21;
+}
+
+message Int32List{
+    repeated int32 value = 14;
+}
+
+message Vfo{
+    double frequency = 2;
+    string mode = 3;
+    int32 pb_width = 4;
+    int32 ant = 5;
+    int32 rit = 9;
+    int32 xit = 10;
+    Split split = 11;
+    int32 tuning_step = 12;
+    repeated string functions = 13;
+    map<string,float> levels = 14;
+    map<string,float> parameters = 15;
+}
+
+message MetaData{
+    bool has_frequency = 1;
+    bool has_mode = 2;
+    bool has_pb_width = 3;
+    bool has_ant = 4;
+    bool has_rit = 5;
+    bool has_xit = 6;
+    bool has_split = 7;
+    bool has_tuning_step = 8;
+    bool has_functions = 9;
+    bool has_levels = 10;
+    bool has_parameters = 11;
+    bool has_ptt = 12;
+    bool has_radio_on = 13;
+    bool has_polling_interval = 14;
+}
+
+message Channel{
+    int32 channel = 1;
+}
+
+message Value{
+  string name = 1;
+  float step = 2;
+  float min = 3;
+  float max = 4;
+}
+
+message Function{
+  string func = 1;
+  bool value = 2;
+}
+
+message Level{
+  string func = 1;
+  bool value = 2;
+}
+
+message Parameter{
+  string param = 1;
+  bool value = 2;
+}
+
+message Split{
+  bool enabled = 1;
+  string vfo = 2;
+  double frequency = 3;
+  string mode = 4;
+  int32 pbWidth = 5;
+}
+
+// enum OPERATION {
+//   NONE = 0;
+//   CPY = 1;
+//   XCHG = 2;
+//   FROM_VFO = 3;
+//   TO_VFO = 4;
+//   UP = 5;
+//   DOWN = 6;
+//   BAND_UP = 7;
+//   BAND_DOWN = 8;
+//   TUNE = 9;
+//   TOGGLE = 10;
+// }
+//
+// enum LEVELS {
+//   LEVEL_PREAMP = 1;
+//   LEVEL_ATT = 2;
+//   LEVEL_VOX = 3;
+//   LEVEL_AF = 4;
+//   LEVEL_RF = 5;
+//   LEVEL_SQL = 6;
+//   LEVEL_IF = 7;
+//   LEVEL_NR = 8;
+//   LEVEL_CWPITCH = 9;
+//   LEVEL_RFPOWER = 10;
+//   LEVEL_MICGAIN = 11;
+//   LEVEL_KEYSPD = 12;
+//   LEVEL_NOTCHF = 13;
+//   LEVEL_COMP = 14;
+//   LEVEL_AGC = 15;
+//   LEVEL_BKINDL = 16;
+//   LEVEL_METER = 17;
+//   LEVEL_VOXGAIN = 18;
+//   LEVEL_ANTIVOX = 19;
+//   LEVEL_RAWSTR = 20;
+//   LEVEL_SWR = 21;
+//   LEVEL_ALC = 22;
+// }
+//
+// enum FUNCTIONS {
+//   FUNC_NB = 1;
+//   FUNC_COMP = 2;
+//   FUNC_VOX = 3;
+//   FUNC_TONE = 4;
+//   FUNC_TSQL = 5;
+//   FUNC_FBKIN = 6;
+//   FUNC_ANF = 7;
+//   FUNC_NR = 8;
+//   FUNC_MON = 9;
+//   FUNC_MN = 10;
+//   FUNC_LOCK = 11;
+// }
+//
+// enum PARAMETERS {
+//   PARAM_DUMMY = 1;
+// }
+//
+// enum VFOS {
+//   VFO_NONE = 1;
+//   VFOA = 2;
+//   VFOB = 3;
+//   VFOC = 4;
+//   VFO_CURRENT = 5;
+//   VFO_MAIN = 6;
+//   VFO_SUB = 7;
+//   VFO_MEM = 8;
+//   // VFO_TX_FLAG = 8;
+//   // RIG_VFO_VFO = 9;
+//   // RIG_VFO_RX = 10;
+// }
+//
+// enum MODES {
+//   MODE_NONE = 1;
+//   MODE_AM = 2;
+//   MODE_CW = 3;
+//   MODE_USB = 4;
+//   MODE_LSB = 5;
+//   MODE_RTTY = 6;
+//   MODE_FM = 7;
+//   MODE_WFM = 8;
+//   MODE_CWR = 9;
+//   MODE_RTTYR = 10;
+//   MODE_AMS = 11;
+//   MODE_PKTLSB = 12;
+//   MODE_PKTUSB = 13;
+//   MODE_PKTFM = 14;
+//   MODE_ECSSUSB = 15;
+//   MODE_ECSSLSB = 16;
+//   MODE_FAX = 17;
+//   MODE_SAM = 18;
+//   MODE_SAL = 19;
+//   MODE_SAH = 20;
+//   MODE_DSB = 21;
+//   MODE_FMN = 22;
+//   MODE_TESTS_MAX = 23;
+// }
+//
+
+//
+// enum PTT{
+//   PTT_OFF = 1;
+//   PTT_ON = 2;
+//   PTT_ON_MIC = 3;
+//   PTT_ON_DATA = 4;
+// }
+//
+// enum DEBUG_LEVEL{
+//   NONE = 1;
+//   BUG = 2;
+//   ERRROR = 3;
+//   WARNING = 4;
+//   VERBOSE = 5;
+//   TRACE = 6;
+// }
