@@ -45,6 +45,13 @@ message Capabilities{
     string version = 19;
     string mfg_name = 20;
     string status = 21;
+    bool has_powerstat = 22;
+    bool has_ant = 23;
+    bool has_rit = 24;
+    bool has_xit = 25;
+    bool has_split = 26;
+    bool has_ts = 27;
+    bool has_ptt = 28;
 }
 
 message Int32List{

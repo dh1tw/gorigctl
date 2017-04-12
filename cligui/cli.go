@@ -144,10 +144,10 @@ func (r *remoteRadio) populateCliCmds() {
 	r.cliCmds = append(r.cliCmds, cliSetPowerStat)
 
 	cliSetSplit := cliCmd{
-		Cmd:         setSplit,
-		Name:        "set_split",
+		Cmd:         setSplitVfo,
+		Name:        "set_split_vfo",
 		Shortcut:    "S",
-		Parameters:  "Split [true, t, 1, false, f, 0]",
+		Parameters:  "Split [true, t, 1, false, f, 0], VFO",
 		Description: "Turn Split On/Off",
 		Example:     "S 1",
 	}
@@ -272,14 +272,16 @@ func setMode(r *remoteRadio, args []string) {
 		pbWidth, err := strconv.ParseInt(args[1], 10, 32)
 		if err != nil {
 			r.logger.Println("ERROR: filter width [Hz] must be integer")
+			pbWidth = 0
 		}
 
 		filters, ok := r.caps.Filters[mode]
 		if !ok {
 			r.logger.Println("WARN: no filters found for this mode in rig caps")
-		}
-		if ok := utils.Int32InSlice(int32(pbWidth), filters.Value); !ok {
-			r.logger.Println("WARN: unspported passband width")
+		} else {
+			if ok := utils.Int32InSlice(int32(pbWidth), filters.Value); !ok {
+				r.logger.Println("WARN: unspported passband width")
+			}
 		}
 		req.Vfo.PbWidth = int32(pbWidth)
 		req.Md.HasPbWidth = true
@@ -513,8 +515,8 @@ func getSplit(r *remoteRadio, args []string) {
 	}
 }
 
-func setSplit(r *remoteRadio, args []string) {
-	if !r.checkArgs(args, 1) {
+func setSplitVfo(r *remoteRadio, args []string) {
+	if !r.checkArgs(args, 2) {
 		return
 	}
 
@@ -524,10 +526,16 @@ func setSplit(r *remoteRadio, args []string) {
 		return
 	}
 
+	txVfo := args[1]
+	if !utils.StringInSlice(txVfo, r.caps.Vfos) {
+		r.logger.Println("ERROR: Vfo not supported by this radio")
+	}
+
 	req := r.initSetState()
 	req.Md.HasSplit = true
-
 	req.Vfo.Split.Enabled = splitEnabled
+	req.Vfo.Split.Vfo = txVfo
+
 	if err := r.sendCatRequest(req); err != nil {
 		r.logger.Println("ERROR:", err)
 	}
@@ -546,6 +554,7 @@ func setSplitFreq(r *remoteRadio, args []string) {
 
 	req := r.initSetState()
 	req.Vfo.Split.Enabled = true
+	req.Vfo.Split.Vfo = r.state.Vfo.Split.Vfo
 	req.Vfo.Split.Frequency = freq * 1000
 	req.Md.HasSplit = true
 
@@ -587,6 +596,7 @@ func setSplitMode(r *remoteRadio, args []string) {
 	}
 
 	req.Vfo.Split.Enabled = true
+	req.Vfo.Split.Vfo = r.state.Vfo.Split.Vfo
 
 	if err := r.sendCatRequest(req); err != nil {
 		r.logger.Println("ERROR:", err)

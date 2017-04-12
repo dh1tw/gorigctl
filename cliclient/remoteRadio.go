@@ -13,6 +13,7 @@ import (
 	"github.com/dh1tw/gorigctl/comms"
 	"github.com/dh1tw/gorigctl/events"
 	sbRadio "github.com/dh1tw/gorigctl/sb_radio"
+	sbStatus "github.com/dh1tw/gorigctl/sb_status"
 	"github.com/dh1tw/gorigctl/utils"
 	"github.com/spf13/viper"
 )
@@ -96,7 +97,7 @@ func HandleRemoteRadio(rs RemoteRadioSettings) {
 
 func (r *remoteRadio) deserializeRadioStatus(data []byte) error {
 
-	rStatus := sbRadio.Status{}
+	rStatus := sbStatus.Status{}
 	if err := rStatus.Unmarshal(data); err != nil {
 		return err
 	}

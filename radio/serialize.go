@@ -35,6 +35,12 @@ func (r *radio) serializeCaps() (msg []byte, err error) {
 	caps.ModelName = r.rig.Caps.ModelName
 	caps.Version = r.rig.Caps.Version
 	caps.MfgName = r.rig.Caps.MfgName
+	caps.HasPowerstat = r.rig.Caps.HasGetPowerStat
+	caps.HasPtt = r.rig.Caps.HasGetPtt
+	caps.HasRit = r.rig.Caps.HasGetRit
+	caps.HasXit = r.rig.Caps.HasGetXit
+	caps.HasSplit = r.rig.Caps.HasGetSplitVfo
+	caps.HasTs = r.rig.Caps.HasGetTs
 	status, ok := hl.RigStatusName[r.rig.Caps.Status]
 	if ok {
 		caps.Status = status

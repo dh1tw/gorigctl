@@ -26,6 +26,7 @@ type RadioSettings struct {
 	WaitGroup        *sync.WaitGroup
 	Events           *pubsub.PubSub
 	PollingInterval  time.Duration
+	Logger           *log.Logger
 }
 
 type radio struct {
@@ -33,6 +34,7 @@ type radio struct {
 	state         sbRadio.State
 	settings      *RadioSettings
 	pollingTicker *time.Ticker
+	logger        *log.Logger
 }
 
 func HandleRadio(rs RadioSettings) {
@@ -47,12 +49,13 @@ func HandleRadio(rs RadioSettings) {
 	r.state.Vfo = &sbRadio.Vfo{}
 	r.state.Channel = &sbRadio.Channel{}
 	r.settings = &rs
+	r.logger = rs.Logger
 
 	r.state.PollingInterval = int32(r.settings.PollingInterval.Nanoseconds() / 1000000)
 
 	err := r.rig.Init(rs.RigModel)
 	if err != nil {
-		log.Println(err)
+		r.logger.Println(err)
 		return
 	}
 
@@ -61,66 +64,41 @@ func HandleRadio(rs RadioSettings) {
 	err = r.rig.SetPort(rs.Port)
 	if err != nil {
 		// if we can not set the port, we shut down
-		log.Println(err)
+		r.logger.Println(err)
 		r.settings.Events.Pub(true, events.Shutdown)
 		return
 	}
 
-	if rs.RigModel != 1 { // exception for Dummy Rig
-		if err := r.rig.Open(); err != nil {
-			// if we can not open the port, we shut down
-			log.Println(err)
-			r.settings.Events.Pub(true, events.Shutdown)
-			return
-		}
+	if err := r.rig.Open(); err != nil {
+		// if we can not open the port, we shut down
+		r.logger.Println(err)
+		r.settings.Events.Pub(true, events.Shutdown)
+		return
 	}
 
 	// publish the radio's capabilities
 	if err := r.sendCaps(); err != nil {
-		log.Println(err)
+		r.logger.Println("Couldn't get all capabilities:", err)
 	}
-
-	// // check if the radio is turned on and query its state
-	// rigOn, err := r.rig.GetPowerStat()
-	// if err != nil {
-	// 	log.Println(err)
-	// 	// we should check if the rig might no have the
-	// 	// ability to be turn on/off through CapsTopic
-
-	// 	// let's hope for the best and query it
-	// 	if err := r.queryVfo(); err != nil {
-	// 		log.Println(err)
-	// 	}
-	// } else {
-	// 	// no error and the rig is on so we can query it
-	// 	if rigOn == hl.RIG_POWER_ON {
-	// 		if err := r.queryVfo(); err != nil {
-	// 			log.Println(err)
-	// 		}
-	// 	} else {
-	// 		r.state.RadioOn = false
-	// 	}
-	// }
 
 	if err := r.queryVfo(); err != nil {
 		fmt.Println(err)
 	}
 
 	// if the rig supports fast_commands, then we will use it
-	token, err := r.rig.GetConf("fast_commands_token")
-	if err != nil {
-		log.Println(err)
-	}
-	if len(token) > 0 {
+
+	hasFastToken := r.rig.HasToken("fast_commands_token")
+
+	if hasFastToken {
 		err = r.rig.SetConf("fast_commands_token", "1")
 		if err != nil {
-			log.Println(err)
+			r.logger.Println(err)
 		}
 	}
 
 	// publish the radio's state
 	if err := r.sendState(); err != nil {
-		log.Println(err)
+		r.logger.Println(err)
 	}
 
 	r.pollingTicker = time.NewTicker(r.settings.PollingInterval)
@@ -132,7 +110,7 @@ func HandleRadio(rs RadioSettings) {
 			r.sendState()
 
 		case <-shutdownCh:
-			log.Println("Disconnecting from Radio")
+			r.logger.Println("Disconnecting from Radio")
 			// maybe we have to check if the connection is really open
 			r.rig.Close()
 			r.rig.Cleanup()
@@ -145,136 +123,178 @@ func HandleRadio(rs RadioSettings) {
 }
 
 func (r *radio) queryVfo() error {
-	vfo, err := r.rig.GetVfo()
-	if err != nil {
-		return err
-	}
-	r.state.CurrentVfo = hl.VfoName[vfo]
 
-	if pwrOn, err := r.rig.GetPowerStat(); err != nil {
-		return err
-	} else {
-		if pwrOn == hl.RIG_POWER_ON {
-			r.state.RadioOn = true
-		} else {
+	if r.rig.Caps.HasGetPowerStat {
+		if pwrOn, err := r.rig.GetPowerStat(); err != nil {
+			r.logger.Println(err)
+			// if the radio doesn't respond, lets assume that the radio if off
 			r.state.RadioOn = false
-		}
-	}
-
-	freq, err := r.rig.GetFreq(vfo)
-	if err != nil {
-		return err
-	}
-	r.state.Vfo.Frequency = freq
-
-	mode, pbWidth, err := r.rig.GetMode(vfo)
-	if err != nil {
-		return err
-	}
-	if modeName, ok := hl.ModeName[mode]; ok {
-		r.state.Vfo.Mode = modeName
-	} else {
-		return errors.New("unknown mode")
-	}
-
-	r.state.Vfo.PbWidth = int32(pbWidth)
-
-	ant, err := r.rig.GetAnt(vfo)
-	if err != nil {
-		return err
-	}
-	r.state.Vfo.Ant = int32(ant)
-
-	rit, err := r.rig.GetRit(vfo)
-	if err != nil {
-		return err
-	}
-	r.state.Vfo.Rit = int32(rit)
-
-	xit, err := r.rig.GetXit(vfo)
-	if err != nil {
-		return err
-	}
-	r.state.Vfo.Xit = int32(xit)
-
-	split := sbRadio.Split{}
-
-	splitOn, txVfo, err := r.rig.GetSplit(vfo)
-	if err != nil {
-		return err
-	}
-
-	if splitOn == hl.RIG_SPLIT_ON {
-		split.Enabled = true
-	} else {
-		split.Enabled = false
-	}
-
-	if splitOn == hl.RIG_SPLIT_ON {
-
-		txFreq, err := r.rig.GetSplitFreq(txVfo)
-		if err != nil {
-			return err
-		}
-
-		txMode, txPbWidth, err := r.rig.GetSplitMode(txVfo)
-		if err != nil {
-			return err
-		}
-		split.Frequency = txFreq
-		if txVfoName, ok := hl.VfoName[txVfo]; ok {
-			split.Vfo = txVfoName
 		} else {
-			return errors.New("unknown Vfo Name")
+			if pwrOn == hl.RIG_POWER_ON {
+				r.state.RadioOn = true
+			} else {
+				r.state.RadioOn = false
+			}
 		}
+	}
 
-		if txModeName, ok := hl.ModeName[txMode]; ok {
-			split.Mode = txModeName
+	// Only query radio if Power is On or if Radio has now PowerStat function
+	// in this case we will assume that the radio is turned on
+	if (r.rig.Caps.HasGetPowerStat && r.state.RadioOn) || !r.rig.Caps.HasGetPowerStat {
+
+		vfo := hl.VfoValue["VFO_CURR"]
+
+		if r.rig.Caps.HasGetVfo {
+			vfo, err := r.rig.GetVfo()
+			if err != nil {
+				r.logger.Print(err)
+			} else {
+				r.state.CurrentVfo = hl.VfoName[vfo]
+			}
 		} else {
-			return errors.New("unknown Mode")
+			r.state.CurrentVfo = "VFO_CURR"
 		}
 
-		split.PbWidth = int32(txPbWidth)
-
-	}
-
-	r.state.Vfo.Split = &split
-
-	tStep, err := r.rig.GetTs(vfo)
-	if err != nil {
-		return err
-	}
-	r.state.Vfo.TuningStep = int32(tStep)
-
-	r.state.Vfo.Functions = make([]string, 0, len(hl.FuncName))
-
-	for _, f := range r.rig.Caps.GetFunctions {
-		fValue, err := r.rig.GetFunc(vfo, hl.FuncValue[f])
-		if err != nil {
-			return err
+		if r.rig.Caps.HasGetFreq {
+			freq, err := r.rig.GetFreq(vfo)
+			if err != nil {
+				r.logger.Println(err)
+			} else {
+				r.state.Vfo.Frequency = freq
+			}
 		}
-		if fValue {
-			r.state.Vfo.Functions = append(r.state.Vfo.Functions, f)
-		}
-	}
 
-	r.state.Vfo.Levels = make(map[string]float32)
-	for _, level := range r.rig.Caps.GetLevels {
-		lValue, err := r.rig.GetLevel(vfo, hl.LevelValue[level.Name])
-		if err != nil {
-			// return err
-			log.Println("Warning:", level.Name, "-", err)
+		if r.rig.Caps.HasGetMode {
+			mode, pbWidth, err := r.rig.GetMode(vfo)
+			if err != nil {
+				r.logger.Println(err)
+			} else {
+				if modeName, ok := hl.ModeName[mode]; ok {
+					r.state.Vfo.Mode = modeName
+				} else {
+					r.logger.Println("unknown mode:", mode)
+				}
+				r.state.Vfo.PbWidth = int32(pbWidth)
+			}
 		}
-		r.state.Vfo.Levels[level.Name] = lValue
-	}
 
-	r.state.Vfo.Parameters = make(map[string]float32)
-	for _, param := range r.rig.Caps.GetParameters {
-		pValue, err := r.rig.GetParm(vfo, hl.ParmValue[param.Name])
-		if err != nil {
-			return err
+		if r.rig.Caps.HasGetAnt {
+			ant, err := r.rig.GetAnt(vfo)
+			if err != nil {
+				r.logger.Println(err)
+			} else {
+				r.state.Vfo.Ant = int32(ant)
+			}
 		}
-		r.state.Vfo.Parameters[param.Name] = pValue
+
+		if r.rig.Caps.HasGetRit {
+			rit, err := r.rig.GetRit(vfo)
+			if err != nil {
+				r.logger.Println(err)
+			} else {
+				r.state.Vfo.Rit = int32(rit)
+			}
+		}
+
+		if r.rig.Caps.HasGetRit {
+			xit, err := r.rig.GetXit(vfo)
+			if err != nil {
+				r.logger.Println(err)
+			} else {
+				r.state.Vfo.Xit = int32(xit)
+			}
+		}
+
+		split := sbRadio.Split{}
+
+		if r.rig.Caps.HasGetSplitVfo {
+			splitOn, txVfo, err := r.rig.GetSplit(vfo)
+			if err != nil {
+				r.logger.Println(err)
+			} else {
+				if splitOn == hl.RIG_SPLIT_ON {
+					split.Enabled = true
+				} else {
+					split.Enabled = false
+				}
+				if txVfoName, ok := hl.VfoName[txVfo]; ok {
+					split.Vfo = txVfoName
+				} else {
+					return errors.New("unknown Vfo Name")
+				}
+
+				if splitOn == hl.RIG_SPLIT_ON {
+
+					// these checks should be enabled, but most of the
+					// backends don't have these functions implemented
+					// therefore they use the emulated functions which
+					// unfortunately don't work everywhere well (e.g. TS-480)
+					// if r.rig.Caps.HasGetSplitFreq {
+					txFreq, err := r.rig.GetSplitFreq(txVfo)
+					if err != nil {
+						r.logger.Println(err)
+					} else {
+						split.Frequency = txFreq
+					}
+					// }
+
+					// if r.rig.Caps.HasGetSplitMode {
+					txMode, txPbWidth, err := r.rig.GetSplitMode(txVfo)
+					if err != nil {
+						r.logger.Println(err)
+					} else {
+						if txModeName, ok := hl.ModeName[txMode]; ok {
+							split.Mode = txModeName
+						} else {
+							r.logger.Println("unknown Tx Mode")
+						}
+						split.PbWidth = int32(txPbWidth)
+					}
+					// }
+				}
+			}
+		}
+
+		r.state.Vfo.Split = &split
+
+		if r.rig.Caps.HasGetTs {
+			tStep, err := r.rig.GetTs(vfo)
+			if err != nil {
+				r.logger.Println(err)
+			} else {
+				r.state.Vfo.TuningStep = int32(tStep)
+			}
+		}
+
+		r.state.Vfo.Functions = make([]string, 0, len(hl.FuncName))
+
+		for _, f := range r.rig.Caps.GetFunctions {
+			fValue, err := r.rig.GetFunc(vfo, hl.FuncValue[f])
+			if err != nil {
+				r.logger.Println(err)
+			}
+			if fValue {
+				r.state.Vfo.Functions = append(r.state.Vfo.Functions, f)
+			}
+		}
+
+		r.state.Vfo.Levels = make(map[string]float32)
+		for _, level := range r.rig.Caps.GetLevels {
+			lValue, err := r.rig.GetLevel(vfo, hl.LevelValue[level.Name])
+			if err != nil {
+				r.logger.Println("Warning:", level.Name, "-", err)
+			}
+			r.state.Vfo.Levels[level.Name] = lValue
+		}
+
+		r.state.Vfo.Parameters = make(map[string]float32)
+		for _, param := range r.rig.Caps.GetParameters {
+			pValue, err := r.rig.GetParm(vfo, hl.ParmValue[param.Name])
+			if err != nil {
+				r.logger.Println(err)
+			}
+			r.state.Vfo.Parameters[param.Name] = pValue
+		}
 	}
 
 	return nil
@@ -304,7 +324,7 @@ func (r *radio) sendCaps() error {
 		capsMsg.Topic = r.settings.CapsTopic
 		r.settings.ToWireCh <- capsMsg
 	} else {
-		log.Println(err)
+		r.logger.Println(err)
 	}
 
 	return nil
@@ -312,52 +332,65 @@ func (r *radio) sendCaps() error {
 
 func (r *radio) updateMeter() error {
 
-	if !r.state.RadioOn {
-		return nil
-	}
+	// Only update the meter when we can be sure that the radio is
+	// actually turned on. If the rig does not provide the powerstat
+	// we quit to avoid sending messages to the radio which will be
+	// continously rejected
+	// if !r.rig.Caps.HasGetPowerStat && !r.rig.Caps.HasSetPowerStat {
+	// 	return nil
+	// }
 
-	vfo := hl.VfoValue[r.state.CurrentVfo]
+	// if !r.state.RadioOn {
+	// 	return nil
+	// }
 
-	newValueAvailable := false
+	// vfo := hl.VfoValue[r.state.CurrentVfo]
+	// newValueAvailable := false
 
-	if r.state.Ptt {
-		swr, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_SWR)
-		if err != nil {
-			return err
-		}
+	// if r.state.Ptt {
 
-		alc, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_ALC)
-		if err != nil {
-			return err
-		}
+	// 	if swrCurrValue, ok := r.state.Vfo.Levels["SWR"]; ok {
+	// 		swrNewValue, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_SWR)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		if swrNewValue != swrCurrValue {
+	// 			r.state.Vfo.Levels["SWR"] = swrNewValue
+	// 			newValueAvailable = true
+	// 		}
+	// 	}
 
-		if r.state.Vfo.Levels["SWR"] != swr {
-			r.state.Vfo.Levels["SWR"] = swr
-			newValueAvailable = true
-		}
+	// 	if alcCurrValue, ok := r.state.Vfo.Levels["ALC"]; ok {
+	// 		alcNewValue, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_ALC)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		if alcNewValue != alcCurrValue {
+	// 			r.state.Vfo.Levels["ALC"] = alcNewValue
+	// 			newValueAvailable = true
+	// 		}
+	// 	}
 
-		if r.state.Vfo.Levels["ALC"] != alc {
-			r.state.Vfo.Levels["ALC"] = alc
-			newValueAvailable = true
-		}
-	} else {
-		strength, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_STRENGTH)
-		if err != nil {
-			return err
-		}
+	// } else {
 
-		if r.state.Vfo.Levels["STRENGTH"] != strength {
-			r.state.Vfo.Levels["STRENGTH"] = strength
-			newValueAvailable = true
-		}
-	}
+	// 	if sCurrValue, ok := r.state.Vfo.Levels["STRENGTH"]; ok {
+	// 		sNewValue, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_STRENGTH)
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 		if sNewValue != sCurrValue {
+	// 			r.state.Vfo.Levels["STRENGTH"] = sNewValue
+	// 			newValueAvailable = true
+	// 		}
+	// 	}
+	// }
 
-	if newValueAvailable {
-		err := r.sendState()
-		if err != nil {
-			return err
-		}
-	}
+	// if newValueAvailable {
+	// 	err := r.sendState()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	return nil
 }

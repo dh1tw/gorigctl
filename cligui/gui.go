@@ -29,9 +29,13 @@ type radioGui struct {
 	sMeter               *ui.Gauge
 	powerMeter           *ui.Gauge
 	swrMeter             *ui.Gauge
+	antenna              *ui.Par
+	attenuator           *ui.Par
+	preamp               *ui.Par
 	vfo                  *ui.Par
 	mode                 *ui.Par
 	filter               *ui.Par
+	ifShift              *ui.Par
 	rit                  *ui.Par
 	xit                  *ui.Par
 	split                *ui.Par
@@ -139,6 +143,22 @@ func (rg *radioGui) init() {
 	rg.filter.Height = 3
 	rg.filter.BorderLabel = "Filter"
 
+	rg.antenna = ui.NewPar("")
+	rg.antenna.Height = 3
+	rg.antenna.BorderLabel = "Antenna"
+
+	rg.attenuator = ui.NewPar("")
+	rg.attenuator.Height = 3
+	rg.attenuator.BorderLabel = "Att"
+
+	rg.preamp = ui.NewPar("")
+	rg.preamp.Height = 3
+	rg.preamp.BorderLabel = "Preamp"
+
+	rg.ifShift = ui.NewPar("")
+	rg.ifShift.Height = 3
+	rg.ifShift.BorderLabel = "IF Shift"
+
 	rg.rit = ui.NewPar("")
 	rg.rit.Height = 3
 	rg.rit.BorderLabel = "RIT"
@@ -197,9 +217,12 @@ func (rg *radioGui) init() {
 			ui.NewCol(1, 0, rg.vfo),
 			ui.NewCol(1, 0, rg.mode),
 			ui.NewCol(2, 0, rg.filter),
-			ui.NewCol(2, 0, rg.rit),
-			ui.NewCol(2, 0, rg.xit),
-			ui.NewCol(2, 0, nil)),
+			ui.NewCol(1, 0, rg.rit),
+			ui.NewCol(1, 0, rg.xit),
+			ui.NewCol(1, 0, rg.antenna),
+			ui.NewCol(1, 0, rg.attenuator),
+			ui.NewCol(1, 0, rg.preamp),
+			ui.NewCol(1, 0, rg.ifShift)),
 		ui.NewRow(
 			ui.NewCol(2, 0, rg.ptt),
 			ui.NewCol(1, 0, rg.split),
@@ -233,6 +256,10 @@ func (rg *radioGui) calcLogWindowHeight() int {
 		height = rightColumn
 	}
 
+	if height < 20 {
+		height = 20
+	}
+
 	return height
 }
 
@@ -240,9 +267,9 @@ func (rg *radioGui) updateCaps(ev ui.Event) {
 
 	// this event could still thrown by a retained
 	// caps message
-	if !rg.radioOnline {
-		return
-	}
+	// if !rg.radioOnline {
+	// 	return
+	// }
 
 	rg.caps = ev.Data.(sbRadio.Capabilities)
 
@@ -271,6 +298,11 @@ func (rg *radioGui) updateCaps(ev ui.Event) {
 
 	rg.operations.Items = rg.caps.VfoOps
 
+	if !rg.caps.HasPowerstat {
+		rg.powerOn.Text = "n/a"
+	}
+
+	rg.drawState()
 	ui.Clear()
 	ui.Body.Align()
 	ui.Render(ui.Body)
@@ -286,12 +318,16 @@ func (rg *radioGui) updateState(ev ui.Event) {
 
 	// this event could still thrown by a retained
 	// state message
-	if !rg.radioOnline {
-		return
-	}
+	// if !rg.radioOnline {
+	// 	return
+	// }
 
 	rg.state = ev.Data.(sbRadio.State)
+	rg.drawState()
 
+}
+
+func (rg *radioGui) drawState() {
 	if !rg.frequencyInitialized {
 		rg.internalFreq = rg.state.Vfo.Frequency
 		rg.frequencyInitialized = true
@@ -304,16 +340,25 @@ func (rg *radioGui) updateState(ev ui.Event) {
 	rg.rit.Text = fmt.Sprintf("%v Hz", rg.state.Vfo.Rit)
 	if rg.state.Vfo.Rit != 0 {
 		rg.rit.TextBgColor = ui.ColorGreen
+		rg.rit.Bg = ui.ColorGreen
 	} else {
 		rg.rit.TextBgColor = ui.ColorDefault
+		rg.rit.Bg = ui.ColorDefault
 	}
 
 	rg.xit.Text = fmt.Sprintf("%v Hz", rg.state.Vfo.Xit)
 	if rg.state.Vfo.Xit != 0 {
 		rg.xit.TextBgColor = ui.ColorRed
+		rg.xit.Bg = ui.ColorRed
 	} else {
 		rg.xit.TextBgColor = ui.ColorDefault
+		rg.xit.Bg = ui.ColorDefault
 	}
+
+	rg.antenna.Text = fmt.Sprintf("%v", rg.state.Vfo.Ant)
+
+	// rg.attenuator = fmt.Sprintf("%v dB", rg.state.Vfo.Attenuator)
+	// rg.preamp = fmt.Sprintf("%v dB", rg.state.Vfo.Preamp)
 
 	if rg.state.Ptt {
 		rg.ptt.Bg = ui.ColorRed
@@ -326,12 +371,32 @@ func (rg *radioGui) updateState(ev ui.Event) {
 		rg.powerOn.Bg = ui.ColorDefault
 	}
 	if rg.state.Vfo.Split.Enabled {
+		if rg.state.Vfo.Split.Vfo != "" {
+			rg.split.Text = rg.state.Vfo.Split.Vfo
+		} else {
+			rg.split.Text = "n/a"
+		}
+		rg.split.TextBgColor = ui.ColorGreen
 		rg.split.Bg = ui.ColorGreen
-		rg.txFrequency.Text = fmt.Sprintf("%.2f kHz", rg.state.Vfo.Split.Frequency/1000)
-		rg.txMode.Text = rg.state.Vfo.Split.Mode
-		rg.txFilter.Text = fmt.Sprintf("%v Hz", rg.state.Vfo.Split.PbWidth)
+		if rg.state.Vfo.Split.Frequency > 0 {
+			rg.txFrequency.Text = fmt.Sprintf("%.2f kHz", rg.state.Vfo.Split.Frequency/1000)
+		} else {
+			rg.txFrequency.Text = "n/a"
+		}
+		if rg.state.Vfo.Split.Mode != "" {
+			rg.txMode.Text = rg.state.Vfo.Split.Mode
+		} else {
+			rg.txMode.Text = "n/a"
+		}
+		if rg.state.Vfo.Split.PbWidth > 0 {
+			rg.txFilter.Text = fmt.Sprintf("%v Hz", rg.state.Vfo.Split.PbWidth)
+		} else {
+			rg.txFilter.Text = "n/a"
+		}
 	} else {
 		rg.split.Bg = ui.ColorDefault
+		rg.split.TextBgColor = ui.ColorDefault
+		rg.split.Text = ""
 		rg.txFrequency.Text = ""
 		rg.txMode.Text = ""
 		rg.txFilter.Text = ""
@@ -362,6 +427,37 @@ func (rg *radioGui) updateState(ev ui.Event) {
 		}
 	}
 
+	if attValue, ok := rg.state.Vfo.Levels["ATT"]; ok {
+		if attValue > 0 {
+			rg.attenuator.Text = fmt.Sprintf("-%.0f dB", attValue)
+			rg.attenuator.Bg = ui.ColorGreen
+			rg.attenuator.TextBgColor = ui.ColorGreen
+		} else {
+			rg.attenuator.Text = fmt.Sprintf("%.0f dB", attValue)
+			rg.attenuator.Bg = ui.ColorDefault
+			rg.attenuator.TextBgColor = ui.ColorDefault
+		}
+	} else {
+		rg.attenuator.Text = "n/a"
+		rg.attenuator.Bg = ui.ColorDefault
+		rg.attenuator.TextBgColor = ui.ColorDefault
+	}
+
+	if preampValue, ok := rg.state.Vfo.Levels["PREAMP"]; ok {
+		rg.preamp.Text = fmt.Sprintf("%.0f dB", preampValue)
+		if preampValue > 0 {
+			rg.preamp.Bg = ui.ColorGreen
+			rg.preamp.TextBgColor = ui.ColorGreen
+		} else {
+			rg.preamp.Bg = ui.ColorDefault
+			rg.preamp.TextBgColor = ui.ColorDefault
+		}
+	} else {
+		rg.preamp.Text = "n/a"
+		rg.preamp.Bg = ui.ColorDefault
+		rg.preamp.TextBgColor = ui.ColorDefault
+	}
+
 	for i, el := range rg.levelsData {
 		for name, value := range rg.state.Vfo.Levels {
 			if el.Label == name {
@@ -386,7 +482,6 @@ func (rg *radioGui) updateState(ev ui.Event) {
 	rg.functions.Items = SprintFunctions(rg.functionsData)
 
 	ui.Render(ui.Body)
-
 }
 
 // updateLatency updates the Latency chart (2 way ping)

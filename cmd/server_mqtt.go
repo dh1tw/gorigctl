@@ -18,7 +18,6 @@ import (
 	"github.com/spf13/viper"
 
 	hl "github.com/dh1tw/goHamlib"
-	sbRadio "github.com/dh1tw/gorigctl/sb_radio"
 	sbStatus "github.com/dh1tw/gorigctl/sb_status"
 )
 
@@ -180,6 +179,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		WaitGroup:        &wg,
 		Events:           evPS,
 		PollingInterval:  pollingInterval,
+		Logger:           appLogger,
 	}
 
 	wg.Add(4) //MQTT + Ping + Radio + Events
@@ -194,6 +194,8 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 
 	time.Sleep(time.Millisecond * 1300)
 	go radio.HandleRadio(radioSettings)
+
+	loggingCh := evPS.Sub(events.AppLog)
 
 	status := serverStatus{}
 	status.topic = serverStatusTopic
@@ -224,6 +226,9 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 
 			wg.Wait()
 			os.Exit(0)
+
+		case msg := <-loggingCh:
+			fmt.Println(msg.(string))
 
 		case ev := <-connectionStatusCh:
 			connStatus := ev.(int)
@@ -267,7 +272,7 @@ func (s *serverStatus) sendUpdate() error {
 
 func createLastWillMsg() ([]byte, error) {
 
-	willMsg := sbRadio.Status{}
+	willMsg := sbStatus.Status{}
 	willMsg.Online = false
 	data, err := willMsg.Marshal()
 

@@ -2,10 +2,11 @@ package radio
 
 import (
 	"errors"
-	"log"
 	"reflect"
 
 	"time"
+
+	"math"
 
 	hl "github.com/dh1tw/goHamlib"
 	sbRadio "github.com/dh1tw/gorigctl/sb_radio"
@@ -22,7 +23,7 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasRadioOn {
 		if ns.GetRadioOn() != r.state.RadioOn {
 			if err := r.updatePowerOn(ns.GetRadioOn()); err != nil {
-				log.Println(err)
+				r.logger.Println(err)
 			} else {
 				if r.state.RadioOn {
 					r.queryVfo()
@@ -31,121 +32,131 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 		}
 	}
 
-	if r.state.RadioOn {
+	// if r.state.RadioOn {
 
-		if ns.CurrentVfo != r.state.CurrentVfo {
-			if err := r.updateCurrentVfo(ns.CurrentVfo); err != nil {
-				log.Println(err)
+	if ns.CurrentVfo != r.state.CurrentVfo {
+		r.logger.Println("updating CurrentVFO to", ns.CurrentVfo)
+		if err := r.updateCurrentVfo(ns.CurrentVfo); err != nil {
+			r.logger.Println(err)
+		}
+	}
+
+	if len(ns.VfoOperations) > 0 {
+		if err := r.execVfoOperations(ns.GetVfoOperations()); err != nil {
+			r.logger.Println(err)
+		}
+	}
+
+	if ns.Md.HasFrequency {
+		if ns.Vfo.GetFrequency() != r.state.Vfo.Frequency {
+			r.logger.Println("updating Frequency to", ns.Vfo.Frequency)
+			if err := r.updateFrequency(ns.Vfo.GetFrequency()); err != nil {
+				r.logger.Println(err)
 			}
 		}
+	}
 
-		if len(ns.VfoOperations) > 0 {
-			if err := r.execVfoOperations(ns.GetVfoOperations()); err != nil {
-				log.Println(err)
+	if ns.Md.HasMode {
+		if ns.Vfo.GetMode() != r.state.Vfo.Mode {
+			r.logger.Println("updating Mode to", ns.Vfo.Mode)
+			if err := r.updateMode(ns.Vfo.GetMode(), ns.Vfo.GetPbWidth()); err != nil {
+				r.logger.Println(err)
 			}
 		}
+	}
 
-		if ns.Md.HasFrequency {
-			if ns.Vfo.GetFrequency() != r.state.Vfo.Frequency {
-				if err := r.updateFrequency(ns.Vfo.GetFrequency()); err != nil {
-					log.Println(err)
-				}
+	if ns.Md.HasPbWidth {
+		if ns.Vfo.GetPbWidth() != r.state.Vfo.PbWidth {
+			r.logger.Println("updating PbWidth to", ns.Vfo.PbWidth)
+			if err := r.updatePbWidth(ns.Vfo.GetPbWidth()); err != nil {
+				r.logger.Println(err)
 			}
 		}
+	}
 
-		if ns.Md.HasMode {
-			if ns.Vfo.GetMode() != r.state.Vfo.Mode {
-				if err := r.updateMode(ns.Vfo.GetMode(), ns.Vfo.GetPbWidth()); err != nil {
-					log.Println(err)
-				}
+	if ns.Md.HasAnt {
+		if ns.Vfo.GetAnt() != r.state.Vfo.Ant {
+			r.logger.Println("updating Antenna to", ns.Vfo.Ant)
+			if err := r.updateAntenna(ns.Vfo.GetAnt()); err != nil {
+				r.logger.Println(err)
 			}
 		}
+	}
 
-		if ns.Md.HasPbWidth {
-			if ns.Vfo.GetPbWidth() != r.state.Vfo.PbWidth {
-				if err := r.updatePbWidth(ns.Vfo.GetPbWidth()); err != nil {
-					log.Println(err)
-				}
+	if ns.Md.HasRit {
+		if ns.Vfo.GetRit() != r.state.Vfo.Rit {
+			r.logger.Println("updating Rit to", ns.Vfo.Rit)
+			if err := r.updateRit(ns.Vfo.GetRit()); err != nil {
+				r.logger.Println(err)
 			}
 		}
+	}
 
-		if ns.Md.HasAnt {
-			if ns.Vfo.GetAnt() != r.state.Vfo.Ant {
-				if err := r.updateAntenna(ns.Vfo.GetAnt()); err != nil {
-					log.Println(err)
-				}
+	if ns.Md.HasXit {
+		if ns.Vfo.GetXit() != r.state.Vfo.Xit {
+			r.logger.Println("updating Xit to", ns.Vfo.Xit)
+			if err := r.updateXit(ns.Vfo.GetXit()); err != nil {
+				r.logger.Println(err)
 			}
 		}
+	}
 
-		if ns.Md.HasRit {
-			if ns.Vfo.GetRit() != r.state.Vfo.Rit {
-				if err := r.updateRit(ns.Vfo.GetRit()); err != nil {
-					log.Println(err)
-				}
-			}
-		}
-
-		if ns.Md.HasXit {
-			if ns.Vfo.GetXit() != r.state.Vfo.Xit {
-				if err := r.updateXit(ns.Vfo.GetXit()); err != nil {
-					log.Println(err)
-				}
-			}
-		}
-
-		if ns.Md.HasSplit {
-			if ns.Vfo.Split != nil {
-				if !reflect.DeepEqual(ns.Vfo.Split, r.state.Vfo.Split) {
-					if err := r.updateSplit(ns.Vfo.Split); err != nil {
-						log.Println(err)
-					}
-				}
-			}
-		}
-
-		if ns.Md.HasTuningStep {
-			if ns.Vfo.GetTuningStep() != r.state.Vfo.TuningStep {
-				if err := r.updateTs(ns.Vfo.GetTuningStep()); err != nil {
-					log.Println(err)
-				}
-			}
-		}
-
-		if ns.Md.HasFunctions {
-			if ns.Vfo.Functions != nil {
-				if !reflect.DeepEqual(ns.Vfo.Functions, r.state.Vfo.Functions) {
-					if err := r.updateFunctions(ns.Vfo.GetFunctions()); err != nil {
-						log.Println(err)
-					}
-				}
-			}
-		}
-
-		if ns.Md.HasLevels {
-			if ns.Vfo.Levels != nil {
-				if !reflect.DeepEqual(ns.Vfo.Levels, r.state.Vfo.Levels) {
-					if err := r.updateLevels(ns.Vfo.GetLevels()); err != nil {
-						log.Println(err)
-					}
-				}
-			}
-		}
-
-		if ns.Md.HasParameters {
-			if ns.Vfo.Parameters != nil {
-				if !reflect.DeepEqual(ns.Vfo.Parameters, r.state.Vfo.Parameters) {
-					if err := r.updateParams(ns.Vfo.GetParameters()); err != nil {
-						log.Println(err)
-					}
+	if ns.Md.HasSplit {
+		if ns.Vfo.Split != nil {
+			if !reflect.DeepEqual(ns.Vfo.Split, r.state.Vfo.Split) {
+				r.logger.Println("updating Split to", ns.Vfo.Split)
+				if err := r.updateSplit(ns.Vfo.Split); err != nil {
+					r.logger.Println(err)
 				}
 			}
 		}
 	}
 
+	if ns.Md.HasTuningStep {
+		if ns.Vfo.GetTuningStep() != r.state.Vfo.TuningStep {
+			r.logger.Println("updating TS to", ns.Vfo.TuningStep)
+			if err := r.updateTs(ns.Vfo.GetTuningStep()); err != nil {
+				r.logger.Println(err)
+			}
+		}
+	}
+
+	if ns.Md.HasFunctions {
+		if ns.Vfo.Functions != nil {
+			if !reflect.DeepEqual(ns.Vfo.Functions, r.state.Vfo.Functions) {
+				if err := r.updateFunctions(ns.Vfo.GetFunctions()); err != nil {
+					r.logger.Println(err)
+				}
+			}
+		}
+	}
+
+	if ns.Md.HasLevels {
+		if ns.Vfo.Levels != nil {
+			if !reflect.DeepEqual(ns.Vfo.Levels, r.state.Vfo.Levels) {
+				if err := r.updateLevels(ns.Vfo.GetLevels()); err != nil {
+					r.logger.Println(err)
+				}
+			}
+		}
+	}
+
+	if ns.Md.HasParameters {
+		if ns.Vfo.Parameters != nil {
+			if !reflect.DeepEqual(ns.Vfo.Parameters, r.state.Vfo.Parameters) {
+				if err := r.updateParams(ns.Vfo.GetParameters()); err != nil {
+					r.logger.Println(err)
+				}
+			}
+		}
+	}
+	// }
+
 	if ns.Md.HasPtt {
 		if ns.GetPtt() != r.state.Ptt {
+			r.logger.Println("updating PTT to", ns.Ptt)
 			if err := r.updatePtt(ns.GetPtt()); err != nil {
-				log.Println(err)
+				r.logger.Println(err)
 			}
 		}
 	}
@@ -218,6 +229,11 @@ func (r *radio) execVfoOperations(vfoOps []string) error {
 }
 
 func (r *radio) updateMode(newMode string, newPbWidth int32) error {
+
+	if !r.rig.Caps.HasSetMode || !r.rig.Caps.HasGetMode {
+		return errors.New("unable to update mode; function not implemented")
+	}
+
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
 	pbWidth := int(r.state.Vfo.PbWidth)
@@ -229,6 +245,7 @@ func (r *radio) updateMode(newMode string, newPbWidth int32) error {
 	if !ok {
 		return errors.New("unknown mode")
 	}
+
 	err := r.rig.SetMode(vfo, newModeValue, pbWidth)
 	if err != nil {
 		pbNormal, err := r.rig.GetPbNormal(newModeValue)
@@ -246,10 +263,14 @@ func (r *radio) updateMode(newMode string, newPbWidth int32) error {
 		return err
 	}
 
-	ts, err := r.rig.GetTs(vfo)
-	if err != nil {
-		return err
+	ts := 0
+	if r.rig.Caps.HasGetTs {
+		ts, err = r.rig.GetTs(vfo)
+		if err != nil {
+			return err
+		}
 	}
+
 	r.state.Vfo.TuningStep = int32(ts)
 	r.state.Vfo.Mode = hl.ModeName[mode]
 	r.state.Vfo.PbWidth = int32(pbWidth)
@@ -258,6 +279,11 @@ func (r *radio) updateMode(newMode string, newPbWidth int32) error {
 }
 
 func (r *radio) updatePbWidth(newPbWidth int32) error {
+
+	if !r.rig.Caps.HasSetMode || !r.rig.Caps.HasGetMode {
+		return errors.New("unable to update mode/filter; function not implemented")
+	}
+
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 	modeValue := hl.ModeValue[r.state.Vfo.Mode]
 	err := r.rig.SetMode(vfo, modeValue, int(newPbWidth))
@@ -270,9 +296,12 @@ func (r *radio) updatePbWidth(newPbWidth int32) error {
 		return err
 	}
 
-	ts, err := r.rig.GetTs(vfo)
-	if err != nil {
-		return err
+	ts := 0
+	if r.rig.Caps.HasGetTs {
+		ts, err = r.rig.GetTs(vfo)
+		if err != nil {
+			return err
+		}
 	}
 
 	r.state.Vfo.TuningStep = int32(ts)
@@ -350,118 +379,128 @@ func (r *radio) updateXit(newXit int32) error {
 }
 
 func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
+
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
+
+	if !r.rig.Caps.HasGetSplitVfo || !r.rig.Caps.HasSetSplitVfo {
+		return errors.New("radio doesn't support split")
+	}
+
 	if newSplit.GetEnabled() != r.state.Vfo.Split.Enabled {
-		err := r.rig.SetSplit(vfo, utils.Btoi(newSplit.GetEnabled()))
+
+		txVfo, ok := hl.VfoValue[newSplit.GetVfo()]
+		if !ok {
+			return errors.New("unknown tx (split) vfo")
+		}
+
+		err := r.rig.SetSplitVfo(vfo, utils.Btoi(newSplit.GetEnabled()), txVfo)
 		if err != nil {
 			return err
 		}
 
-		r.state.Vfo.Split.Enabled = newSplit.Enabled
-	}
-
-	if newSplit.GetEnabled() {
-
-		if newSplit.GetVfo() != r.state.Vfo.Split.Vfo &&
-			len(newSplit.GetVfo()) > 0 {
-
-			txVfo, ok := hl.VfoValue[newSplit.GetVfo()]
-			if !ok {
-				return errors.New("unknown split tx vfo")
-			}
-
-			err := r.rig.SetSplitVfo(vfo, utils.Btoi(newSplit.GetEnabled()), txVfo)
-			if err != nil {
-				return err
-			}
-			r.state.Vfo.Split.Vfo = newSplit.GetVfo()
-		} else {
-			txVfo := hl.RIG_VFO_NONE
-			if vfo == hl.RIG_VFO_A {
-				txVfo = hl.RIG_VFO_B
-			} else {
-				txVfo = hl.RIG_VFO_A
-			}
-
-			err := r.rig.SetSplitVfo(vfo, utils.Btoi(true), txVfo)
-			if err != nil {
-				return err
-			}
-			r.state.Vfo.Split.Vfo = hl.VfoName[txVfo]
+		// verify and set the radio's split vfo, enabled flag
+		checkSplitEnabled, checkTxVfo, err := r.rig.GetSplitVfo(vfo)
+		if err != nil {
+			return err
 		}
 
+		r.state.Vfo.Split.Vfo, _ = hl.VfoName[checkTxVfo]
+		r.state.Vfo.Split.Enabled = utils.Itob(checkSplitEnabled)
+	}
+
+	if !r.state.Vfo.Split.Enabled {
+		// unset split frequency, mode, pbWidth
+		r.state.Vfo.Split.Frequency = 0
+		r.state.Vfo.Split.Mode = ""
+		r.state.Vfo.Split.Vfo = ""
+		r.state.Vfo.Split.PbWidth = 0
+		return nil
+	}
+
+	if r.rig.Caps.HasGetSplitFreq && r.rig.Caps.HasSetSplitFreq {
 		if newSplit.GetFrequency() != r.state.Vfo.Split.Frequency &&
 			newSplit.GetFrequency() > 0 {
 
 			txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
 			if !ok {
-				return errors.New("unknown VFO")
+				return errors.New("unknown tx (split) vfo")
 			}
 
 			err := r.rig.SetSplitFreq(txVfo, newSplit.GetFrequency())
 			if err != nil {
 				return err
 			}
-			r.state.Vfo.Split.Frequency = newSplit.GetFrequency()
-		} else {
-			txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
-			if !ok {
-				return errors.New("unknown VFO")
-			}
-			txFreq, err := r.rig.GetSplitFreq(txVfo)
+		}
+
+		// verify and copy the radio's split frequency
+		txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
+		if !ok {
+			return errors.New("unknown tx (split) vfo")
+		}
+		txFreq, err := r.rig.GetSplitFreq(txVfo)
+		if err != nil {
+			return err
+		}
+		r.state.Vfo.Split.Frequency = txFreq
+	}
+
+	// this check should be performed as some of the rigs (e.g. TS-480)
+	// don't work well with the fallback functions
+
+	// if r.rig.Caps.HasGetSplitMode && r.rig.Caps.HasSetSplitMode {
+	if newSplit.GetMode() != r.state.Vfo.Split.Mode &&
+		len(newSplit.GetMode()) > 0 {
+
+		txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
+		if !ok {
+			return errors.New("unknown tx (split) vfo")
+		}
+
+		newSplitModeValue, ok := hl.ModeValue[newSplit.GetMode()]
+		if !ok {
+			return errors.New("unknown tx (split) mode")
+		}
+
+		pbWidth := r.state.Vfo.Split.PbWidth
+		if newSplit.GetPbWidth() > 0 {
+			pbWidth = newSplit.GetPbWidth()
+		}
+
+		err := r.rig.SetSplitMode(txVfo, newSplitModeValue, int(pbWidth))
+		if err != nil {
+			// get the standard filter width for this radio
+			pbNormal, err := r.rig.GetPbNormal(newSplitModeValue)
 			if err != nil {
 				return err
 			}
-			r.state.Vfo.Split.Frequency = txFreq
+			// try again with the standard filter width
+			err = r.rig.SetSplitMode(txVfo, newSplitModeValue, pbNormal)
+			if err != nil {
+				return err
+			}
 		}
+	}
 
-		if newSplit.GetMode() != r.state.Vfo.Split.Mode &&
+	// verify and copy the radio's txMode and txPbWidth
+	txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
+	if !ok {
+		return errors.New("unknown VFO")
+	}
+	txMode, txPbWidth, err := r.rig.GetSplitMode(txVfo)
+	if err != nil {
+		return err
+	}
+	r.state.Vfo.Split.Mode = hl.ModeName[txMode]
+	r.state.Vfo.Split.PbWidth = int32(txPbWidth)
+
+	return nil
+	// }
+
+	// we only reach this code if the mode is the same, but we want
+	// to update the filter width
+	if r.rig.Caps.HasGetSplitMode && r.rig.Caps.HasSetSplitMode {
+		if newSplit.GetPbWidth() != r.state.Vfo.Split.PbWidth &&
 			len(newSplit.GetMode()) > 0 {
-
-			txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
-			if !ok {
-				return errors.New("unknown VFO")
-			}
-
-			newSplitModeValue, ok := hl.ModeValue[newSplit.GetMode()]
-			if !ok {
-				return errors.New("unknown split mode")
-			}
-
-			pbWidth := r.state.Vfo.Split.PbWidth
-			if newSplit.GetPbWidth() > 0 {
-				pbWidth = newSplit.GetPbWidth()
-			}
-
-			err := r.rig.SetSplitMode(txVfo, newSplitModeValue, int(pbWidth))
-			if err != nil {
-				if err != nil {
-					pbNormal, err := r.rig.GetPbNormal(newSplitModeValue)
-					if err != nil {
-						return err
-					}
-					err = r.rig.SetSplitMode(txVfo, newSplitModeValue, pbNormal)
-					if err != nil {
-						return err
-					}
-				}
-			}
-			r.state.Vfo.Split.Mode = newSplit.GetMode()
-
-		} else {
-			txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
-			if !ok {
-				return errors.New("unknown VFO")
-			}
-			txMode, txPbWidth, err := r.rig.GetSplitMode(txVfo)
-			if err != nil {
-				return err
-			}
-			r.state.Vfo.Split.Mode = hl.ModeName[txMode]
-			r.state.Vfo.Split.PbWidth = int32(txPbWidth)
-		}
-
-		if newSplit.GetPbWidth() != r.state.Vfo.Split.PbWidth {
 
 			txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
 			if !ok {
@@ -473,14 +512,19 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 			if err != nil {
 				return err
 			}
-			r.state.Vfo.Split.PbWidth = newSplit.GetPbWidth()
 		}
-	} else {
-		// unset split frequency, mode, pbWidth
-		r.state.Vfo.Split.Frequency = 0
-		r.state.Vfo.Split.Mode = ""
-		r.state.Vfo.Split.Vfo = ""
-		r.state.Vfo.Split.PbWidth = 0
+
+		// verify and copy the radio's mode and txPbWidth
+		txVfo, ok = hl.VfoValue[r.state.Vfo.Split.Vfo]
+		if !ok {
+			return errors.New("unknown VFO")
+		}
+		txMode, txPbWidth, err := r.rig.GetSplitMode(txVfo)
+		if err != nil {
+			return err
+		}
+		r.state.Vfo.Split.Mode = hl.ModeName[txMode]
+		r.state.Vfo.Split.PbWidth = int32(txPbWidth)
 	}
 
 	return nil
@@ -557,7 +601,24 @@ func (r *radio) updateLevels(newLevels map[string]float32) error {
 				return nil
 			}
 
-			r.state.Vfo.Levels[k] = v
+			// lets verify if the value has been set
+			gl, err := r.rig.HasGetLevel(levelValue)
+			if err != nil {
+				return err
+			}
+
+			if gl == levelValue {
+				gv, err := r.rig.GetLevel(vfo, levelValue)
+				if err != nil {
+					return err
+				}
+				// allow some rounding when comparing floats
+				if math.Abs(float64(gv))-math.Abs(float64(v)) > 0.1 {
+					r.logger.Printf("WARN: Level %s could not be set", k)
+				}
+				r.state.Vfo.Levels[k] = gv
+			}
+
 		}
 	}
 
@@ -619,7 +680,20 @@ func (r *radio) updatePtt(ptt bool) error {
 		return err
 	}
 
-	r.state.Ptt = ptt
+	time.Sleep(30 * time.Millisecond)
+	p, err := r.rig.GetPtt(vfo)
+	if err != nil {
+		return err
+	}
+
+	r.logger.Println("ptt should be:", ptt)
+	r.logger.Println("ptt is:", p)
+
+	if p == hl.RIG_PTT_ON {
+		r.state.Ptt = true
+	} else {
+		r.state.Ptt = false
+	}
 
 	return nil
 }
