@@ -54,7 +54,7 @@ func HandleRemoteRadio(rs RemoteRadioSettings) {
 
 	r := remoteRadio{}
 	r.state.Vfo = &sbRadio.Vfo{}
-	r.state.Vfo.Functions = make([]string, 0, 20)
+	r.state.Vfo.Functions = make(map[string]bool)
 	r.state.Vfo.Levels = make(map[string]float32)
 	r.state.Vfo.Parameters = make(map[string]float32)
 	r.state.Vfo.Split = &sbRadio.Split{}
@@ -337,7 +337,7 @@ func (r *remoteRadio) updateSplit(newSplit *sbRadio.Split) error {
 	return nil
 }
 
-func (r *remoteRadio) updateFunctions(newFuncs []string) error {
+func (r *remoteRadio) updateFunctions(newFuncs map[string]bool) error {
 
 	r.state.Vfo.Functions = newFuncs
 

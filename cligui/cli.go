@@ -104,8 +104,8 @@ func (r *remoteRadio) populateCliCmds() {
 		Name:        "set_func",
 		Shortcut:    "U",
 		Parameters:  "Function",
-		Description: "Toggles a Rig function",
-		Example:     "U NB",
+		Description: "Set a Rig function",
+		Example:     "U NB true",
 	}
 
 	r.cliCmds = append(r.cliCmds, cliSetFunction)
@@ -483,26 +483,29 @@ func getFunction(r *remoteRadio, args []string) {
 }
 
 func setFunction(r *remoteRadio, args []string) {
-	if !r.checkArgs(args, 1) {
+	if !r.checkArgs(args, 2) {
 		return
 	}
 
 	funcName := args[0]
+	if !utils.StringInSlice(funcName, r.caps.SetFunctions) {
+		r.logger.Println("unknown function")
+	}
+
+	value, err := strconv.ParseBool(args[1])
+	if err != nil {
+		r.logger.Println("ERROR: function value must be of type bool (1,t,true / 0,f,false")
+		return
+	}
 
 	req := r.initSetState()
-	req.Vfo.Functions = r.state.Vfo.Functions
 	req.Md.HasFunctions = true
-
-	if !utils.StringInSlice(funcName, req.Vfo.Functions) {
-		req.Vfo.Functions = append(req.Vfo.Functions, funcName)
-	} else {
-		req.Vfo.Functions = utils.RemoveStringFromSlice(funcName, req.Vfo.Functions)
-	}
+	req.Vfo.Functions = make(map[string]bool)
+	req.Vfo.Functions[funcName] = value
 
 	if err := r.sendCatRequest(req); err != nil {
 		r.logger.Println("ERROR:", err)
 	}
-
 }
 
 func getSplit(r *remoteRadio, args []string) {

@@ -654,21 +654,28 @@ func getFunction(r *remoteRadio, args []string) {
 }
 
 func setFunction(r *remoteRadio, args []string) {
-	if !checkArgs(args, 1) {
+	if !checkArgs(args, 2) {
 		fmt.Println("Available Functions:", r.caps.SetFunctions)
 		return
 	}
 
 	funcName := args[0]
+	if utils.StringInSlice(funcName, r.caps.SetFunctions) {
+		fmt.Println("unknown function")
+		return
+	}
+
+	value, err := strconv.ParseBool(args[1])
+	if err != nil {
+		fmt.Println("ERROR: function value must be of type bool (1,t,true / 0,f,false")
+		return
+	}
 
 	req := r.initSetState()
+	req.Vfo.Functions = r.state.Vfo.Functions
 	req.Md.HasFunctions = true
 
-	if !utils.StringInSlice(funcName, req.Vfo.Functions) {
-		req.Vfo.Functions = append(req.Vfo.Functions, funcName)
-	} else {
-		req.Vfo.Functions = utils.RemoveStringFromSlice(funcName, req.Vfo.Functions)
-	}
+	req.Vfo.Functions[funcName] = value
 
 	if err := r.sendCatRequest(req); err != nil {
 		fmt.Println("ERROR:", err)

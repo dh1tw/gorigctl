@@ -193,10 +193,30 @@ func (r *radio) updateCurrentVfo(newVfo string) error {
 
 func (r *radio) updateFrequency(newFreq float64) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
+
+	// if the rig supports fast_commands, then we will use it
+
+	hasFastToken := r.rig.HasToken("fast_commands_token")
+
+	if hasFastToken {
+		err := r.rig.SetConf("fast_commands_token", "1")
+		if err != nil {
+			r.logger.Println(err)
+		}
+	}
+
 	err := r.rig.SetFreq(vfo, newFreq)
 	if err != nil {
 		return err
 	}
+
+	if hasFastToken {
+		err = r.rig.SetConf("fast_commands_token", "0")
+		if err != nil {
+			r.logger.Println(err)
+		}
+	}
+
 	r.state.Vfo.Frequency = newFreq
 	return nil
 }
@@ -547,37 +567,34 @@ func (r *radio) updateTs(newTs int32) error {
 	return nil
 }
 
-func (r *radio) updateFunctions(newFuncs []string) error {
+func (r *radio) updateFunctions(newFuncs map[string]bool) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
 	// functions to be enabled
-	diff := utils.SliceDiff(newFuncs, r.state.Vfo.Functions)
-	for _, f := range diff {
-		funcValue, ok := hl.FuncValue[f]
+	for funcName, newFuncValue := range newFuncs {
+		funcValue, ok := hl.FuncValue[funcName]
 		if !ok {
 			return errors.New("unknown function")
 		}
-		err := r.rig.SetFunc(vfo, funcValue, true)
-		if err != nil {
-			return err
+		// make sure that the radio can actually set this function
+		if utils.StringInSlice(funcName, r.rig.Caps.SetFunctions) {
+
+			err := r.rig.SetFunc(vfo, funcValue, newFuncValue)
+			if err != nil {
+				return err
+			}
+		} else {
+			r.logger.Println("radio does not support setting function", funcName)
 		}
 
-		r.state.Vfo.Functions = append(r.state.Vfo.Functions, f)
-	}
-
-	// functions to be disabled
-	diff = utils.SliceDiff(r.state.Vfo.Functions, newFuncs)
-	for _, f := range diff {
-		funcValue, ok := hl.FuncValue[f]
-		if !ok {
-			return errors.New("unknown function")
+		// verify and read the current value
+		if utils.StringInSlice(funcName, r.rig.Caps.GetFunctions) {
+			cfmFuncValue, err := r.rig.GetFunc(vfo, funcValue)
+			if err != nil {
+				return err
+			}
+			r.state.Vfo.Functions[funcName] = cfmFuncValue
 		}
-		err := r.rig.SetFunc(vfo, funcValue, false)
-		if err != nil {
-			return err
-		}
-
-		r.state.Vfo.Functions = utils.RemoveStringFromSlice(f, r.state.Vfo.Functions)
 	}
 
 	return nil

@@ -275,8 +275,6 @@ func (rg *radioGui) updateCaps(ev ui.Event) {
 
 	// update GUI Layout
 	rg.operations.Height = 2 + len(rg.caps.VfoOps)
-	rg.levels.Height = 2 + len(rg.caps.GetLevels)
-	rg.functions.Height = 2 + len(rg.caps.GetFunctions)
 	rg.parameters.Height = 2 + len(rg.caps.GetParameters)
 	rg.log.Height = rg.calcLogWindowHeight()
 
@@ -288,12 +286,44 @@ func (rg *radioGui) updateCaps(ev ui.Event) {
 		fData := GuiFunction{Label: funcName}
 		rg.functionsData = append(rg.functionsData, fData)
 	}
+
+	// add the write-only (set)functions
+	for _, funcName := range rg.caps.SetFunctions {
+		found := false
+		for _, f := range rg.functionsData {
+			if f.Label == funcName {
+				found = true
+			}
+		}
+		if !found {
+			fData := GuiFunction{Label: funcName, SetOnly: true}
+			rg.functionsData = append(rg.functionsData, fData)
+		}
+	}
+
+	rg.functions.Height = 2 + len(rg.functionsData)
 	rg.functions.Items = SprintFunctions(rg.functionsData)
 
 	for _, level := range rg.caps.GetLevels {
 		lData := GuiLevel{Label: level.Name}
 		rg.levelsData = append(rg.levelsData, lData)
 	}
+
+	// add the write-only (set)levels
+	for _, level := range rg.caps.SetLevels {
+		found := false
+		for _, l := range rg.levelsData {
+			if l.Label == level.Name {
+				found = true
+			}
+		}
+		if !found {
+			lData := GuiLevel{Label: level.Name, SetOnly: true}
+			rg.levelsData = append(rg.levelsData, lData)
+		}
+	}
+
+	rg.levels.Height = 2 + len(rg.levelsData)
 	rg.levels.Items = SprintLevels(rg.levelsData)
 
 	rg.operations.Items = rg.caps.VfoOps
@@ -468,15 +498,8 @@ func (rg *radioGui) drawState() {
 	rg.levels.Items = SprintLevels(rg.levelsData)
 
 	for i, el := range rg.functionsData {
-		found := false
-		for _, funcName := range rg.state.Vfo.Functions {
-			if el.Label == funcName {
-				rg.functionsData[i].Set = true
-				found = true
-			}
-			if !found {
-				rg.functionsData[i].Set = false
-			}
+		if _, ok := rg.state.Vfo.Functions[el.Label]; ok {
+			rg.functionsData[i].Set = rg.state.Vfo.Functions[el.Label]
 		}
 	}
 	rg.functions.Items = SprintFunctions(rg.functionsData)
@@ -542,29 +565,31 @@ func guiLoop(caps sbRadio.Capabilities, evPS *pubsub.PubSub) {
 	ui.Handle("/radio/status", rg.updateRadioStatus)
 	ui.Handle("/timer/1s", rg.syncFrequency)
 
-	// ui.Handle("/sys/kbd/<up>", func(ui.Event) {
-	// 	if serverOnline && rg.state.RadioOn {
-	// 		intFreq += float64(rg.state.Vfo.TuningStep)
-	// 		freq := intFreq / 1000
-	// 		cmd := []string{"set_freq", fmt.Sprintf("%.2f", freq)}
-	// 		evPS.Pub(cmd, events.CliInput)
-	// 		frequencyWidget.Text = utils.FormatFreq(intFreq)
-	// 		ui.Render(frequencyWidget)
-	// 		lastFreqChange = time.Now()
-	// 	}
-	// })
+	ui.Handle("/sys/kbd/<up>", func(ui.Event) {
+		// if rg.radioOnline && rg.state.RadioOn {
+		if rg.radioOnline && rg.state.RadioOn {
+			rg.internalFreq += float64(rg.state.Vfo.TuningStep)
+			freq := rg.internalFreq / 1000
+			cmd := []string{"set_freq", fmt.Sprintf("%.2f", freq)}
+			evPS.Pub(cmd, events.CliInput)
+			rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
+			ui.Render(rg.frequency)
+			rg.lastFreqChange = time.Now()
+		}
+	})
 
-	// ui.Handle("/sys/kbd/<down>", func(ui.Event) {
-	// 	if serverOnline && state.RadioOn {
-	// 		intFreq -= float64(state.Vfo.TuningStep)
-	// 		freq := intFreq / 1000
-	// 		cmd := []string{"set_freq", fmt.Sprintf("%.2f", freq)}
-	// 		evPS.Pub(cmd, events.CliInput)
-	// 		frequencyWidget.Text = utils.FormatFreq(intFreq)
-	// 		ui.Render(frequencyWidget)
-	// 		lastFreqChange = time.Now()
-	// 	}
-	// })
+	ui.Handle("/sys/kbd/<down>", func(ui.Event) {
+		// if rg.radioOnline && rg.state.RadioOn {
+		if rg.radioOnline && rg.state.RadioOn {
+			rg.internalFreq -= float64(rg.state.Vfo.TuningStep)
+			freq := rg.internalFreq / 1000
+			cmd := []string{"set_freq", fmt.Sprintf("%.2f", freq)}
+			evPS.Pub(cmd, events.CliInput)
+			rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
+			ui.Render(rg.frequency)
+			rg.lastFreqChange = time.Now()
+		}
+	})
 
 	ui.Handle("/sys/kbd/C-c", func(ui.Event) {
 		ui.StopLoop()
@@ -592,8 +617,9 @@ func guiLoop(caps sbRadio.Capabilities, evPS *pubsub.PubSub) {
 }
 
 type GuiFunction struct {
-	Label string
-	Set   bool
+	Label   string
+	Set     bool
+	SetOnly bool
 }
 
 func SprintFunctions(fs []GuiFunction) []string {
@@ -605,6 +631,8 @@ func SprintFunctions(fs []GuiFunction) []string {
 		}
 		if el.Set {
 			item = item + "[X]"
+		} else if el.SetOnly {
+			item = item + "[SetOnly]"
 		} else {
 			item = item + "[ ]"
 		}
@@ -620,18 +648,23 @@ func SprintLevels(lv []GuiLevel) []string {
 		for i := len(item); i < 13; i++ {
 			item = item + " "
 		}
-		intr, frac := math.Modf(float64(el.Value))
-		if frac > 0 {
-			item = item + fmt.Sprintf("%.2f", el.Value)
+		if el.SetOnly {
+			item = item + fmt.Sprint("SetOnly")
 		} else {
-			item = item + fmt.Sprintf("%.0f", intr)
+			intr, frac := math.Modf(float64(el.Value))
+			if frac > 0 {
+				item = item + fmt.Sprintf("%.2f", el.Value)
+			} else {
+				item = item + fmt.Sprintf("%.0f", intr)
+			}
+			s = append(s, item)
 		}
-		s = append(s, item)
 	}
 	return s
 }
 
 type GuiLevel struct {
-	Label string
-	Value float32
+	Label   string
+	Value   float32
+	SetOnly bool
 }

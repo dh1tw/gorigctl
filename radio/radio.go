@@ -35,6 +35,8 @@ type radio struct {
 	settings      *RadioSettings
 	pollingTicker *time.Ticker
 	logger        *log.Logger
+	lastUpdate    time.Time
+	updateTicker  *time.Ticker
 }
 
 func HandleRadio(rs RadioSettings) {
@@ -85,23 +87,13 @@ func HandleRadio(rs RadioSettings) {
 		fmt.Println(err)
 	}
 
-	// if the rig supports fast_commands, then we will use it
-
-	hasFastToken := r.rig.HasToken("fast_commands_token")
-
-	if hasFastToken {
-		err = r.rig.SetConf("fast_commands_token", "1")
-		if err != nil {
-			r.logger.Println(err)
-		}
-	}
-
 	// publish the radio's state
 	if err := r.sendState(); err != nil {
 		r.logger.Println(err)
 	}
 
 	r.pollingTicker = time.NewTicker(r.settings.PollingInterval)
+	r.updateTicker = time.NewTicker(time.Second)
 
 	for {
 		select {
@@ -118,6 +110,9 @@ func HandleRadio(rs RadioSettings) {
 
 		case <-r.pollingTicker.C:
 			r.updateMeter()
+
+		case <-r.updateTicker.C:
+			// r.queryVfo()
 		}
 	}
 }
@@ -142,7 +137,7 @@ func (r *radio) queryVfo() error {
 	// in this case we will assume that the radio is turned on
 	if (r.rig.Caps.HasGetPowerStat && r.state.RadioOn) || !r.rig.Caps.HasGetPowerStat {
 
-		vfo := hl.VfoValue["VFO_CURR"]
+		vfo := hl.VfoValue["CURR"]
 
 		if r.rig.Caps.HasGetVfo {
 			vfo, err := r.rig.GetVfo()
@@ -152,7 +147,7 @@ func (r *radio) queryVfo() error {
 				r.state.CurrentVfo = hl.VfoName[vfo]
 			}
 		} else {
-			r.state.CurrentVfo = "VFO_CURR"
+			r.state.CurrentVfo = "CURR"
 		}
 
 		if r.rig.Caps.HasGetFreq {
@@ -266,16 +261,14 @@ func (r *radio) queryVfo() error {
 			}
 		}
 
-		r.state.Vfo.Functions = make([]string, 0, len(hl.FuncName))
+		r.state.Vfo.Functions = make(map[string]bool)
 
 		for _, f := range r.rig.Caps.GetFunctions {
 			fValue, err := r.rig.GetFunc(vfo, hl.FuncValue[f])
 			if err != nil {
 				r.logger.Println(err)
 			}
-			if fValue {
-				r.state.Vfo.Functions = append(r.state.Vfo.Functions, f)
-			}
+			r.state.Vfo.Functions[f] = fValue
 		}
 
 		r.state.Vfo.Levels = make(map[string]float32)
@@ -295,7 +288,13 @@ func (r *radio) queryVfo() error {
 			}
 			r.state.Vfo.Parameters[param.Name] = pValue
 		}
+
+		r.logger.Println("Functions: ", r.state.Vfo.Functions)
+		r.logger.Println("Levels:", r.state.Vfo.Levels)
+		r.logger.Println("Parameters", r.state.Vfo.Parameters)
 	}
+
+	r.lastUpdate = time.Now()
 
 	return nil
 }
@@ -336,61 +335,61 @@ func (r *radio) updateMeter() error {
 	// actually turned on. If the rig does not provide the powerstat
 	// we quit to avoid sending messages to the radio which will be
 	// continously rejected
-	// if !r.rig.Caps.HasGetPowerStat && !r.rig.Caps.HasSetPowerStat {
-	// 	return nil
-	// }
+	if !r.rig.Caps.HasGetPowerStat && !r.rig.Caps.HasSetPowerStat {
+		return nil
+	}
 
-	// if !r.state.RadioOn {
-	// 	return nil
-	// }
+	if !r.state.RadioOn {
+		return nil
+	}
 
-	// vfo := hl.VfoValue[r.state.CurrentVfo]
-	// newValueAvailable := false
+	vfo := hl.VfoValue[r.state.CurrentVfo]
+	newValueAvailable := false
 
-	// if r.state.Ptt {
+	if r.state.Ptt {
 
-	// 	if swrCurrValue, ok := r.state.Vfo.Levels["SWR"]; ok {
-	// 		swrNewValue, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_SWR)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		if swrNewValue != swrCurrValue {
-	// 			r.state.Vfo.Levels["SWR"] = swrNewValue
-	// 			newValueAvailable = true
-	// 		}
-	// 	}
+		if swrCurrValue, ok := r.state.Vfo.Levels["SWR"]; ok {
+			swrNewValue, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_SWR)
+			if err != nil {
+				return err
+			}
+			if swrNewValue != swrCurrValue {
+				r.state.Vfo.Levels["SWR"] = swrNewValue
+				newValueAvailable = true
+			}
+		}
 
-	// 	if alcCurrValue, ok := r.state.Vfo.Levels["ALC"]; ok {
-	// 		alcNewValue, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_ALC)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		if alcNewValue != alcCurrValue {
-	// 			r.state.Vfo.Levels["ALC"] = alcNewValue
-	// 			newValueAvailable = true
-	// 		}
-	// 	}
+		if alcCurrValue, ok := r.state.Vfo.Levels["ALC"]; ok {
+			alcNewValue, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_ALC)
+			if err != nil {
+				return err
+			}
+			if alcNewValue != alcCurrValue {
+				r.state.Vfo.Levels["ALC"] = alcNewValue
+				newValueAvailable = true
+			}
+		}
 
-	// } else {
+	} else {
 
-	// 	if sCurrValue, ok := r.state.Vfo.Levels["STRENGTH"]; ok {
-	// 		sNewValue, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_STRENGTH)
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 		if sNewValue != sCurrValue {
-	// 			r.state.Vfo.Levels["STRENGTH"] = sNewValue
-	// 			newValueAvailable = true
-	// 		}
-	// 	}
-	// }
+		if sCurrValue, ok := r.state.Vfo.Levels["STRENGTH"]; ok {
+			sNewValue, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_STRENGTH)
+			if err != nil {
+				return err
+			}
+			if sNewValue != sCurrValue {
+				r.state.Vfo.Levels["STRENGTH"] = sNewValue
+				newValueAvailable = true
+			}
+		}
+	}
 
-	// if newValueAvailable {
-	// 	err := r.sendState()
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
+	if newValueAvailable {
+		err := r.sendState()
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

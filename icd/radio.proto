@@ -67,7 +67,7 @@ message Vfo{
     int32 xit = 10;
     Split split = 11;
     int32 tuning_step = 12;
-    repeated string functions = 13;
+    map<string, bool> functions = 13;
     map<string,float> levels = 14;
     map<string,float> parameters = 15;
 }
