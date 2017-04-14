@@ -26,7 +26,8 @@ type RadioSettings struct {
 	WaitGroup        *sync.WaitGroup
 	Events           *pubsub.PubSub
 	PollingInterval  time.Duration
-	Logger           *log.Logger
+	RadioLogger      *log.Logger
+	AppLogger        *log.Logger
 }
 
 type radio struct {
@@ -34,7 +35,8 @@ type radio struct {
 	state         sbRadio.State
 	settings      *RadioSettings
 	pollingTicker *time.Ticker
-	logger        *log.Logger
+	radioLogger   *log.Logger
+	appLogger     *log.Logger
 	lastUpdate    time.Time
 	updateTicker  *time.Ticker
 }
@@ -51,13 +53,14 @@ func HandleRadio(rs RadioSettings) {
 	r.state.Vfo = &sbRadio.Vfo{}
 	r.state.Channel = &sbRadio.Channel{}
 	r.settings = &rs
-	r.logger = rs.Logger
+	r.radioLogger = rs.RadioLogger
+	r.appLogger = rs.AppLogger
 
 	r.state.PollingInterval = int32(r.settings.PollingInterval.Nanoseconds() / 1000000)
 
 	err := r.rig.Init(rs.RigModel)
 	if err != nil {
-		r.logger.Println(err)
+		r.radioLogger.Println(err)
 		return
 	}
 
@@ -66,21 +69,21 @@ func HandleRadio(rs RadioSettings) {
 	err = r.rig.SetPort(rs.Port)
 	if err != nil {
 		// if we can not set the port, we shut down
-		r.logger.Println(err)
+		r.radioLogger.Println(err)
 		r.settings.Events.Pub(true, events.Shutdown)
 		return
 	}
 
 	if err := r.rig.Open(); err != nil {
 		// if we can not open the port, we shut down
-		r.logger.Println(err)
+		r.radioLogger.Println(err)
 		r.settings.Events.Pub(true, events.Shutdown)
 		return
 	}
 
 	// publish the radio's capabilities
 	if err := r.sendCaps(); err != nil {
-		r.logger.Println("Couldn't get all capabilities:", err)
+		r.radioLogger.Println("Couldn't get all capabilities:", err)
 	}
 
 	if err := r.queryVfo(); err != nil {
@@ -89,7 +92,7 @@ func HandleRadio(rs RadioSettings) {
 
 	// publish the radio's state
 	if err := r.sendState(); err != nil {
-		r.logger.Println(err)
+		r.radioLogger.Println(err)
 	}
 
 	r.pollingTicker = time.NewTicker(r.settings.PollingInterval)
@@ -102,7 +105,7 @@ func HandleRadio(rs RadioSettings) {
 			r.sendState()
 
 		case <-shutdownCh:
-			r.logger.Println("Disconnecting from Radio")
+			r.appLogger.Println("Disconnecting from Radio")
 			// maybe we have to check if the connection is really open
 			r.rig.Close()
 			r.rig.Cleanup()
@@ -112,7 +115,10 @@ func HandleRadio(rs RadioSettings) {
 			r.updateMeter()
 
 		case <-r.updateTicker.C:
-			// r.queryVfo()
+			r.queryVfo()
+			if err := r.sendState(); err != nil {
+				r.radioLogger.Println(err)
+			}
 		}
 	}
 }
@@ -121,7 +127,7 @@ func (r *radio) queryVfo() error {
 
 	if r.rig.Caps.HasGetPowerStat {
 		if pwrOn, err := r.rig.GetPowerStat(); err != nil {
-			r.logger.Println(err)
+			r.radioLogger.Println(err)
 			// if the radio doesn't respond, lets assume that the radio if off
 			r.state.RadioOn = false
 		} else {
@@ -142,7 +148,7 @@ func (r *radio) queryVfo() error {
 		if r.rig.Caps.HasGetVfo {
 			vfo, err := r.rig.GetVfo()
 			if err != nil {
-				r.logger.Print(err)
+				r.radioLogger.Print(err)
 			} else {
 				r.state.CurrentVfo = hl.VfoName[vfo]
 			}
@@ -153,7 +159,7 @@ func (r *radio) queryVfo() error {
 		if r.rig.Caps.HasGetFreq {
 			freq, err := r.rig.GetFreq(vfo)
 			if err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			} else {
 				r.state.Vfo.Frequency = freq
 			}
@@ -162,12 +168,12 @@ func (r *radio) queryVfo() error {
 		if r.rig.Caps.HasGetMode {
 			mode, pbWidth, err := r.rig.GetMode(vfo)
 			if err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			} else {
 				if modeName, ok := hl.ModeName[mode]; ok {
 					r.state.Vfo.Mode = modeName
 				} else {
-					r.logger.Println("unknown mode:", mode)
+					r.radioLogger.Println("unknown mode:", mode)
 				}
 				r.state.Vfo.PbWidth = int32(pbWidth)
 			}
@@ -176,7 +182,7 @@ func (r *radio) queryVfo() error {
 		if r.rig.Caps.HasGetAnt {
 			ant, err := r.rig.GetAnt(vfo)
 			if err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			} else {
 				r.state.Vfo.Ant = int32(ant)
 			}
@@ -185,7 +191,7 @@ func (r *radio) queryVfo() error {
 		if r.rig.Caps.HasGetRit {
 			rit, err := r.rig.GetRit(vfo)
 			if err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			} else {
 				r.state.Vfo.Rit = int32(rit)
 			}
@@ -194,7 +200,7 @@ func (r *radio) queryVfo() error {
 		if r.rig.Caps.HasGetRit {
 			xit, err := r.rig.GetXit(vfo)
 			if err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			} else {
 				r.state.Vfo.Xit = int32(xit)
 			}
@@ -205,7 +211,7 @@ func (r *radio) queryVfo() error {
 		if r.rig.Caps.HasGetSplitVfo {
 			splitOn, txVfo, err := r.rig.GetSplit(vfo)
 			if err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			} else {
 				if splitOn == hl.RIG_SPLIT_ON {
 					split.Enabled = true
@@ -227,7 +233,7 @@ func (r *radio) queryVfo() error {
 					// if r.rig.Caps.HasGetSplitFreq {
 					txFreq, err := r.rig.GetSplitFreq(txVfo)
 					if err != nil {
-						r.logger.Println(err)
+						r.radioLogger.Println(err)
 					} else {
 						split.Frequency = txFreq
 					}
@@ -236,12 +242,12 @@ func (r *radio) queryVfo() error {
 					// if r.rig.Caps.HasGetSplitMode {
 					txMode, txPbWidth, err := r.rig.GetSplitMode(txVfo)
 					if err != nil {
-						r.logger.Println(err)
+						r.radioLogger.Println(err)
 					} else {
 						if txModeName, ok := hl.ModeName[txMode]; ok {
 							split.Mode = txModeName
 						} else {
-							r.logger.Println("unknown Tx Mode")
+							r.radioLogger.Println("unknown Tx Mode")
 						}
 						split.PbWidth = int32(txPbWidth)
 					}
@@ -255,7 +261,7 @@ func (r *radio) queryVfo() error {
 		if r.rig.Caps.HasGetTs {
 			tStep, err := r.rig.GetTs(vfo)
 			if err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			} else {
 				r.state.Vfo.TuningStep = int32(tStep)
 			}
@@ -266,7 +272,7 @@ func (r *radio) queryVfo() error {
 		for _, f := range r.rig.Caps.GetFunctions {
 			fValue, err := r.rig.GetFunc(vfo, hl.FuncValue[f])
 			if err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			}
 			r.state.Vfo.Functions[f] = fValue
 		}
@@ -275,7 +281,7 @@ func (r *radio) queryVfo() error {
 		for _, level := range r.rig.Caps.GetLevels {
 			lValue, err := r.rig.GetLevel(vfo, hl.LevelValue[level.Name])
 			if err != nil {
-				r.logger.Println("Warning:", level.Name, "-", err)
+				r.radioLogger.Println("Warning:", level.Name, "-", err)
 			}
 			r.state.Vfo.Levels[level.Name] = lValue
 		}
@@ -284,14 +290,10 @@ func (r *radio) queryVfo() error {
 		for _, param := range r.rig.Caps.GetParameters {
 			pValue, err := r.rig.GetParm(vfo, hl.ParmValue[param.Name])
 			if err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			}
 			r.state.Vfo.Parameters[param.Name] = pValue
 		}
-
-		r.logger.Println("Functions: ", r.state.Vfo.Functions)
-		r.logger.Println("Levels:", r.state.Vfo.Levels)
-		r.logger.Println("Parameters", r.state.Vfo.Parameters)
 	}
 
 	r.lastUpdate = time.Now()
@@ -323,7 +325,7 @@ func (r *radio) sendCaps() error {
 		capsMsg.Topic = r.settings.CapsTopic
 		r.settings.ToWireCh <- capsMsg
 	} else {
-		r.logger.Println(err)
+		r.radioLogger.Println(err)
 	}
 
 	return nil
@@ -335,7 +337,8 @@ func (r *radio) updateMeter() error {
 	// actually turned on. If the rig does not provide the powerstat
 	// we quit to avoid sending messages to the radio which will be
 	// continously rejected
-	if !r.rig.Caps.HasGetPowerStat && !r.rig.Caps.HasSetPowerStat {
+
+	if !r.rig.Caps.HasGetPowerStat || !r.rig.Caps.HasSetPowerStat {
 		return nil
 	}
 
@@ -346,7 +349,7 @@ func (r *radio) updateMeter() error {
 	vfo := hl.VfoValue[r.state.CurrentVfo]
 	newValueAvailable := false
 
-	if r.state.Ptt {
+	if r.rig.Caps.HasGetPtt && r.state.Ptt {
 
 		if swrCurrValue, ok := r.state.Vfo.Levels["SWR"]; ok {
 			swrNewValue, err := r.rig.GetLevel(vfo, hl.RIG_LEVEL_SWR)

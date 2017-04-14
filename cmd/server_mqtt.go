@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,7 +19,10 @@ import (
 	"github.com/spf13/viper"
 
 	hl "github.com/dh1tw/goHamlib"
+	sbLog "github.com/dh1tw/gorigctl/sb_log"
 	sbStatus "github.com/dh1tw/gorigctl/sb_status"
+
+	_ "net/http/pprof"
 )
 
 // serverMqttCmd represents the mqtt command
@@ -80,7 +84,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	serverCatRequestTopic := baseTopic + "/setstate"
 	serverStatusTopic := baseTopic + "/status"
 	serverPingTopic := baseTopic + "/ping"
-	// errorTopic := baseTopic + "/error"
+	logTopic := baseTopic + "/log"
 
 	// tx topics
 	serverCatResponseTopic := baseTopic + "/state"
@@ -95,7 +99,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	toDeserializePingRequestCh := make(chan []byte, 10)
 
 	// Event PubSub
-	evPS := pubsub.New(10)
+	evPS := pubsub.New(100)
 
 	// WaitGroup to coordinate a graceful shutdown
 	var wg sync.WaitGroup
@@ -114,6 +118,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	}
 
 	appLogger := utils.NewStdLogger("")
+	radioLogger := utils.NewChLogger(evPS, events.RadioLog, "")
 
 	mqttSettings := comms.MqttSettings{
 		WaitGroup:  &wg,
@@ -179,7 +184,8 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		WaitGroup:        &wg,
 		Events:           evPS,
 		PollingInterval:  pollingInterval,
-		Logger:           appLogger,
+		RadioLogger:      radioLogger,
+		AppLogger:        appLogger,
 	}
 
 	wg.Add(4) //MQTT + Ping + Radio + Events
@@ -188,6 +194,9 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	shutdownCh := evPS.Sub(events.Shutdown)
 	prepareShutdownCh := evPS.Sub(events.PrepareShutdown)
 
+	appLoggingCh := evPS.Sub(events.AppLog)
+	radioLoggingCh := evPS.Sub(events.RadioLog)
+
 	go events.WatchSystemEvents(evPS, &wg)
 	go comms.MqttClient(mqttSettings)
 	go ping.EchoPing(pongSettings)
@@ -195,10 +204,9 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	time.Sleep(time.Millisecond * 1300)
 	go radio.HandleRadio(radioSettings)
 
-	loggingCh := evPS.Sub(events.AppLog)
-
 	status := serverStatus{}
-	status.topic = serverStatusTopic
+	status.statusTopic = serverStatusTopic
+	status.logTopic = logTopic
 	status.toWireCh = toWireCh
 
 	for {
@@ -227,8 +235,13 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 			wg.Wait()
 			os.Exit(0)
 
-		case msg := <-loggingCh:
+		case msg := <-appLoggingCh:
 			fmt.Println(msg.(string))
+
+		case msg := <-radioLoggingCh:
+			if err := status.sendLogMsg(msg.(string)); err != nil {
+				fmt.Println(err)
+			}
 
 		case ev := <-connectionStatusCh:
 			connStatus := ev.(int)
@@ -246,9 +259,10 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 }
 
 type serverStatus struct {
-	online   bool
-	topic    string
-	toWireCh chan comms.IOMsg
+	online      bool
+	statusTopic string
+	logTopic    string
+	toWireCh    chan comms.IOMsg
 }
 
 func (s *serverStatus) sendUpdate() error {
@@ -262,7 +276,7 @@ func (s *serverStatus) sendUpdate() error {
 
 	m := comms.IOMsg{}
 	m.Data = data
-	m.Topic = s.topic
+	m.Topic = s.statusTopic
 	m.Retain = true
 
 	s.toWireCh <- m
@@ -277,4 +291,30 @@ func createLastWillMsg() ([]byte, error) {
 	data, err := willMsg.Marshal()
 
 	return data, err
+}
+
+func (s *serverStatus) sendLogMsg(msg string) error {
+
+	if !s.online {
+		return errors.New("Can not publish log message since server is offline")
+	}
+
+	e := sbLog.LogMsg{}
+	e.Level = sbLog.LOG_LEVEL_WARNING
+	e.Msg = msg
+
+	ba, err := e.Marshal()
+	if err != nil {
+		return err
+	}
+
+	m := comms.IOMsg{}
+	m.Data = ba
+	m.Topic = s.logTopic
+
+	s.toWireCh <- m
+
+	fmt.Println(msg)
+
+	return nil
 }

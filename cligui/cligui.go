@@ -8,6 +8,7 @@ import (
 	"github.com/cskr/pubsub"
 	"github.com/dh1tw/gorigctl/comms"
 	"github.com/dh1tw/gorigctl/events"
+	sbLog "github.com/dh1tw/gorigctl/sb_log"
 	sbRadio "github.com/dh1tw/gorigctl/sb_radio"
 	sbStatus "github.com/dh1tw/gorigctl/sb_status"
 	"github.com/dh1tw/gorigctl/utils"
@@ -19,6 +20,7 @@ type RemoteRadioSettings struct {
 	CatResponseCh   chan []byte
 	RadioStatusCh   chan []byte
 	CatRequestTopic string
+	RadioLogCh      chan []byte
 	PongCh          chan []int64
 	ToWireCh        chan comms.IOMsg
 	CapabilitiesCh  chan []byte
@@ -103,6 +105,9 @@ func HandleRemoteRadio(rs RemoteRadioSettings) {
 
 		case msg := <-cliInputCh:
 			r.parseCli(msg.([]string))
+
+		case msg := <-rs.RadioLogCh:
+			r.deserializeRadioLogMsg(msg)
 
 		case msg := <-loggingCh:
 			// forward to GUI event handler to be shown in the
@@ -433,4 +438,16 @@ func (r *remoteRadio) initSetState() sbRadio.SetState {
 	request.UserId = r.userID
 
 	return request
+}
+
+func (r *remoteRadio) deserializeRadioLogMsg(ba []byte) {
+
+	radioLogMsg := sbLog.LogMsg{}
+	err := radioLogMsg.Unmarshal(ba)
+	if err != nil {
+		r.logger.Println("could not unmarshal radio log message")
+		return
+	}
+
+	ui.SendCustomEvt("/log/msg", radioLogMsg.Msg)
 }

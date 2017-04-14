@@ -6,8 +6,6 @@ import (
 
 	"time"
 
-	"math"
-
 	hl "github.com/dh1tw/goHamlib"
 	sbRadio "github.com/dh1tw/gorigctl/sb_radio"
 	"github.com/dh1tw/gorigctl/utils"
@@ -23,7 +21,7 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasRadioOn {
 		if ns.GetRadioOn() != r.state.RadioOn {
 			if err := r.updatePowerOn(ns.GetRadioOn()); err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			} else {
 				if r.state.RadioOn {
 					r.queryVfo()
@@ -35,68 +33,69 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	// if r.state.RadioOn {
 
 	if ns.CurrentVfo != r.state.CurrentVfo {
-		r.logger.Println("updating CurrentVFO to", ns.CurrentVfo)
+		r.appLogger.Println("updating vfo to", ns.CurrentVfo)
 		if err := r.updateCurrentVfo(ns.CurrentVfo); err != nil {
-			r.logger.Println(err)
+			r.radioLogger.Println(err)
 		}
 	}
 
 	if len(ns.VfoOperations) > 0 {
+		r.appLogger.Println("executing vfo operation(s)", ns.VfoOperations)
 		if err := r.execVfoOperations(ns.GetVfoOperations()); err != nil {
-			r.logger.Println(err)
+			r.radioLogger.Println(err)
 		}
 	}
 
 	if ns.Md.HasFrequency {
-		if ns.Vfo.GetFrequency() != r.state.Vfo.Frequency {
-			r.logger.Println("updating Frequency to", ns.Vfo.Frequency)
-			if err := r.updateFrequency(ns.Vfo.GetFrequency()); err != nil {
-				r.logger.Println(err)
+		if ns.Vfo.Frequency != r.state.Vfo.Frequency {
+			r.appLogger.Printf("updating frequency to %.0f Hz\n", ns.Vfo.Frequency)
+			if err := r.updateFrequency(ns.Vfo.Frequency); err != nil {
+				r.radioLogger.Println(err)
 			}
 		}
 	}
 
 	if ns.Md.HasMode {
 		if ns.Vfo.GetMode() != r.state.Vfo.Mode {
-			r.logger.Println("updating Mode to", ns.Vfo.Mode)
+			r.appLogger.Println("updating mode to", ns.Vfo.Mode)
 			if err := r.updateMode(ns.Vfo.GetMode(), ns.Vfo.GetPbWidth()); err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			}
 		}
 	}
 
 	if ns.Md.HasPbWidth {
 		if ns.Vfo.GetPbWidth() != r.state.Vfo.PbWidth {
-			r.logger.Println("updating PbWidth to", ns.Vfo.PbWidth)
+			r.appLogger.Printf("updating pbwidth to %d Hz\n", ns.Vfo.PbWidth)
 			if err := r.updatePbWidth(ns.Vfo.GetPbWidth()); err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			}
 		}
 	}
 
 	if ns.Md.HasAnt {
 		if ns.Vfo.GetAnt() != r.state.Vfo.Ant {
-			r.logger.Println("updating Antenna to", ns.Vfo.Ant)
+			r.appLogger.Println("updating antenna to", ns.Vfo.Ant)
 			if err := r.updateAntenna(ns.Vfo.GetAnt()); err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			}
 		}
 	}
 
 	if ns.Md.HasRit {
 		if ns.Vfo.GetRit() != r.state.Vfo.Rit {
-			r.logger.Println("updating Rit to", ns.Vfo.Rit)
+			r.appLogger.Printf("updating rit to %d Hz\n", ns.Vfo.Rit)
 			if err := r.updateRit(ns.Vfo.GetRit()); err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			}
 		}
 	}
 
 	if ns.Md.HasXit {
 		if ns.Vfo.GetXit() != r.state.Vfo.Xit {
-			r.logger.Println("updating Xit to", ns.Vfo.Xit)
+			r.appLogger.Printf("updating xit to %d Hz\n", ns.Vfo.Xit)
 			if err := r.updateXit(ns.Vfo.GetXit()); err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			}
 		}
 	}
@@ -104,9 +103,9 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasSplit {
 		if ns.Vfo.Split != nil {
 			if !reflect.DeepEqual(ns.Vfo.Split, r.state.Vfo.Split) {
-				r.logger.Println("updating Split to", ns.Vfo.Split)
+				r.appLogger.Println("updating split to", ns.Vfo.Split)
 				if err := r.updateSplit(ns.Vfo.Split); err != nil {
-					r.logger.Println(err)
+					r.radioLogger.Println(err)
 				}
 			}
 		}
@@ -114,9 +113,9 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasTuningStep {
 		if ns.Vfo.GetTuningStep() != r.state.Vfo.TuningStep {
-			r.logger.Println("updating TS to", ns.Vfo.TuningStep)
+			r.appLogger.Printf("updating tuning step to %d Hz\n", ns.Vfo.TuningStep)
 			if err := r.updateTs(ns.Vfo.GetTuningStep()); err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			}
 		}
 	}
@@ -124,8 +123,9 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasFunctions {
 		if ns.Vfo.Functions != nil {
 			if !reflect.DeepEqual(ns.Vfo.Functions, r.state.Vfo.Functions) {
+				r.appLogger.Println("updating one or more functions")
 				if err := r.updateFunctions(ns.Vfo.GetFunctions()); err != nil {
-					r.logger.Println(err)
+					r.radioLogger.Println(err)
 				}
 			}
 		}
@@ -134,8 +134,9 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasLevels {
 		if ns.Vfo.Levels != nil {
 			if !reflect.DeepEqual(ns.Vfo.Levels, r.state.Vfo.Levels) {
+				r.appLogger.Println("updating one or more levels")
 				if err := r.updateLevels(ns.Vfo.GetLevels()); err != nil {
-					r.logger.Println(err)
+					r.radioLogger.Println(err)
 				}
 			}
 		}
@@ -144,8 +145,9 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasParameters {
 		if ns.Vfo.Parameters != nil {
 			if !reflect.DeepEqual(ns.Vfo.Parameters, r.state.Vfo.Parameters) {
+				r.appLogger.Println("updating one or more parameters")
 				if err := r.updateParams(ns.Vfo.GetParameters()); err != nil {
-					r.logger.Println(err)
+					r.radioLogger.Println(err)
 				}
 			}
 		}
@@ -154,9 +156,9 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasPtt {
 		if ns.GetPtt() != r.state.Ptt {
-			r.logger.Println("updating PTT to", ns.Ptt)
+			r.radioLogger.Println("updating ptt to", ns.Ptt)
 			if err := r.updatePtt(ns.GetPtt()); err != nil {
-				r.logger.Println(err)
+				r.radioLogger.Println(err)
 			}
 		}
 	}
@@ -164,11 +166,13 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasPollingInterval {
 		if ns.GetPollingInterval() != r.state.PollingInterval {
 			if ns.GetPollingInterval() > 0 {
+				r.appLogger.Println("updating rig polling interval to %d ms\n", ns.PollingInterval)
 				newPollingInterval := time.Millisecond * time.Duration(ns.GetPollingInterval())
 				r.pollingTicker.Stop()
 				r.pollingTicker = time.NewTicker(newPollingInterval)
 				r.state.PollingInterval = ns.GetPollingInterval()
 			} else {
+				r.appLogger.Println("stopping rig polling")
 				r.pollingTicker.Stop()
 				r.state.PollingInterval = 0
 			}
@@ -195,13 +199,12 @@ func (r *radio) updateFrequency(newFreq float64) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
 	// if the rig supports fast_commands, then we will use it
-
 	hasFastToken := r.rig.HasToken("fast_commands_token")
 
 	if hasFastToken {
 		err := r.rig.SetConf("fast_commands_token", "1")
 		if err != nil {
-			r.logger.Println(err)
+			r.radioLogger.Println(err)
 		}
 	}
 
@@ -213,7 +216,7 @@ func (r *radio) updateFrequency(newFreq float64) error {
 	if hasFastToken {
 		err = r.rig.SetConf("fast_commands_token", "0")
 		if err != nil {
-			r.logger.Println(err)
+			r.radioLogger.Println(err)
 		}
 	}
 
@@ -241,7 +244,9 @@ func (r *radio) execVfoOperations(vfoOps []string) error {
 			utils.StringInSlice("TO_VFO", vfoOps) ||
 			utils.StringInSlice("MCL", vfoOps) {
 
-			r.queryVfo()
+			if err := r.queryVfo(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -283,6 +288,9 @@ func (r *radio) updateMode(newMode string, newPbWidth int32) error {
 		return err
 	}
 
+	r.state.Vfo.Mode = hl.ModeName[mode]
+	r.state.Vfo.PbWidth = int32(pbWidth)
+
 	ts := 0
 	if r.rig.Caps.HasGetTs {
 		ts, err = r.rig.GetTs(vfo)
@@ -292,8 +300,6 @@ func (r *radio) updateMode(newMode string, newPbWidth int32) error {
 	}
 
 	r.state.Vfo.TuningStep = int32(ts)
-	r.state.Vfo.Mode = hl.ModeName[mode]
-	r.state.Vfo.PbWidth = int32(pbWidth)
 
 	return nil
 }
@@ -316,23 +322,25 @@ func (r *radio) updatePbWidth(newPbWidth int32) error {
 		return err
 	}
 
-	ts := 0
+	r.state.Vfo.Mode = hl.ModeName[mode]
+	r.state.Vfo.PbWidth = int32(pbWidth)
+
 	if r.rig.Caps.HasGetTs {
+		ts := 0
 		ts, err = r.rig.GetTs(vfo)
 		if err != nil {
 			return err
 		}
+		r.state.Vfo.TuningStep = int32(ts)
 	}
-
-	r.state.Vfo.TuningStep = int32(ts)
-	r.state.Vfo.Mode = hl.ModeName[mode]
-	r.state.Vfo.PbWidth = int32(pbWidth)
 
 	return nil
 }
 
 func (r *radio) updateAntenna(newAnt int32) error {
+
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
+
 	err := r.rig.SetAnt(vfo, int(newAnt))
 	if err != nil {
 		return err
@@ -349,50 +357,56 @@ func (r *radio) updateAntenna(newAnt int32) error {
 
 func (r *radio) updateRit(newRit int32) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
+
 	err := r.rig.SetRit(vfo, int(newRit))
 	if err != nil {
 		return err
 	}
+
+	// verify rit
 	rit, err := r.rig.GetRit(vfo)
 	if err != nil {
 		return err
 	}
+	r.state.Vfo.Rit = int32(rit)
 
+	// on some rigs rit will also update xit
 	xit, err := r.rig.GetXit(vfo)
 	if err != nil {
 		return err
 	}
+	r.state.Vfo.Xit = int32(xit)
 
+	// vfo frequency might also have changed
 	freq, err := r.rig.GetFreq(vfo)
 	if err != nil {
 		return err
 	}
-
 	r.state.Vfo.Frequency = freq
-	r.state.Vfo.Rit = int32(rit)
-	r.state.Vfo.Xit = int32(xit)
 
 	return nil
 }
 
 func (r *radio) updateXit(newXit int32) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
+
 	err := r.rig.SetXit(vfo, int(newXit))
 	if err != nil {
 		return err
 	}
 
+	// verify rit
 	xit, err := r.rig.GetXit(vfo)
 	if err != nil {
 		return err
 	}
+	r.state.Vfo.Xit = int32(xit)
 
+	// one some rigs rit will also update rit
 	rit, err := r.rig.GetRit(vfo)
 	if err != nil {
 		return err
 	}
-
-	r.state.Vfo.Xit = int32(xit)
 	r.state.Vfo.Rit = int32(rit)
 
 	return nil
@@ -406,14 +420,14 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 		return errors.New("radio doesn't support split")
 	}
 
-	if newSplit.GetEnabled() != r.state.Vfo.Split.Enabled {
+	if newSplit.Enabled != r.state.Vfo.Split.Enabled {
 
-		txVfo, ok := hl.VfoValue[newSplit.GetVfo()]
+		txVfo, ok := hl.VfoValue[newSplit.Vfo]
 		if !ok {
 			return errors.New("unknown tx (split) vfo")
 		}
 
-		err := r.rig.SetSplitVfo(vfo, utils.Btoi(newSplit.GetEnabled()), txVfo)
+		err := r.rig.SetSplitVfo(vfo, utils.Btoi(newSplit.Enabled), txVfo)
 		if err != nil {
 			return err
 		}
@@ -428,6 +442,7 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 		r.state.Vfo.Split.Enabled = utils.Itob(checkSplitEnabled)
 	}
 
+	// clear if split has been deactivated
 	if !r.state.Vfo.Split.Enabled {
 		// unset split frequency, mode, pbWidth
 		r.state.Vfo.Split.Frequency = 0
@@ -438,25 +453,22 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 	}
 
 	if r.rig.Caps.HasGetSplitFreq && r.rig.Caps.HasSetSplitFreq {
-		if newSplit.GetFrequency() != r.state.Vfo.Split.Frequency &&
-			newSplit.GetFrequency() > 0 {
 
-			txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
-			if !ok {
-				return errors.New("unknown tx (split) vfo")
-			}
+		txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
+		if !ok {
+			return errors.New("unknown tx (split) vfo")
+		}
 
-			err := r.rig.SetSplitFreq(txVfo, newSplit.GetFrequency())
+		if newSplit.Frequency != r.state.Vfo.Split.Frequency &&
+			newSplit.Frequency > 0 {
+
+			err := r.rig.SetSplitFreq(txVfo, newSplit.Frequency)
 			if err != nil {
 				return err
 			}
 		}
 
-		// verify and copy the radio's split frequency
-		txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
-		if !ok {
-			return errors.New("unknown tx (split) vfo")
-		}
+		// verify the radios split frequency
 		txFreq, err := r.rig.GetSplitFreq(txVfo)
 		if err != nil {
 			return err
@@ -464,36 +476,42 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 		r.state.Vfo.Split.Frequency = txFreq
 	}
 
-	// this check should be performed as some of the rigs (e.g. TS-480)
-	// don't work well with the fallback functions
+	// the check below should be performed, but unfortunately, most of the rigs
+	// have not implemented specific functions to set/get split mode. Some
+	// even don't work well with the fallback functions (e.g. TS-480 which
+	// disables the split when querying the split frequency)
 
 	// if r.rig.Caps.HasGetSplitMode && r.rig.Caps.HasSetSplitMode {
-	if newSplit.GetMode() != r.state.Vfo.Split.Mode &&
-		len(newSplit.GetMode()) > 0 {
+	if newSplit.Mode != r.state.Vfo.Split.Mode &&
+		len(newSplit.Mode) > 0 {
 
 		txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
 		if !ok {
 			return errors.New("unknown tx (split) vfo")
 		}
 
-		newSplitModeValue, ok := hl.ModeValue[newSplit.GetMode()]
+		newSplitModeValue, ok := hl.ModeValue[newSplit.Mode]
 		if !ok {
 			return errors.New("unknown tx (split) mode")
 		}
 
 		pbWidth := r.state.Vfo.Split.PbWidth
-		if newSplit.GetPbWidth() > 0 {
-			pbWidth = newSplit.GetPbWidth()
+		if newSplit.PbWidth > 0 {
+			pbWidth = newSplit.PbWidth
 		}
 
 		err := r.rig.SetSplitMode(txVfo, newSplitModeValue, int(pbWidth))
 		if err != nil {
+			// if this fails, we will try to set again the split
+			// mode with the default filter width
+
 			// get the standard filter width for this radio
 			pbNormal, err := r.rig.GetPbNormal(newSplitModeValue)
 			if err != nil {
 				return err
 			}
-			// try again with the standard filter width
+
+			// try again
 			err = r.rig.SetSplitMode(txVfo, newSplitModeValue, pbNormal)
 			if err != nil {
 				return err
@@ -501,10 +519,10 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 		}
 	}
 
-	// verify and copy the radio's txMode and txPbWidth
+	// verify the radios txMode and txPbWidth
 	txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
 	if !ok {
-		return errors.New("unknown VFO")
+		return errors.New("unknown vfo")
 	}
 	txMode, txPbWidth, err := r.rig.GetSplitMode(txVfo)
 	if err != nil {
@@ -519,13 +537,13 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 	// we only reach this code if the mode is the same, but we want
 	// to update the filter width
 	if r.rig.Caps.HasGetSplitMode && r.rig.Caps.HasSetSplitMode {
+		txVfo, ok = hl.VfoValue[r.state.Vfo.Split.Vfo]
+		if !ok {
+			return errors.New("unknown vfo")
+		}
+
 		if newSplit.GetPbWidth() != r.state.Vfo.Split.PbWidth &&
 			len(newSplit.GetMode()) > 0 {
-
-			txVfo, ok := hl.VfoValue[r.state.Vfo.Split.Vfo]
-			if !ok {
-				return errors.New("unknown VFO")
-			}
 
 			splitModeValue := hl.ModeValue[newSplit.GetMode()]
 			err := r.rig.SetSplitMode(txVfo, splitModeValue, int(newSplit.GetPbWidth()))
@@ -534,11 +552,7 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 			}
 		}
 
-		// verify and copy the radio's mode and txPbWidth
-		txVfo, ok = hl.VfoValue[r.state.Vfo.Split.Vfo]
-		if !ok {
-			return errors.New("unknown VFO")
-		}
+		// verify the radios mode and txPbWidth
 		txMode, txPbWidth, err := r.rig.GetSplitMode(txVfo)
 		if err != nil {
 			return err
@@ -572,26 +586,31 @@ func (r *radio) updateFunctions(newFuncs map[string]bool) error {
 
 	// functions to be enabled
 	for funcName, newFuncValue := range newFuncs {
+
 		funcValue, ok := hl.FuncValue[funcName]
 		if !ok {
-			return errors.New("unknown function")
+			r.radioLogger.Println("unknown function", funcName)
+			continue
 		}
+
 		// make sure that the radio can actually set this function
 		if utils.StringInSlice(funcName, r.rig.Caps.SetFunctions) {
 
 			err := r.rig.SetFunc(vfo, funcValue, newFuncValue)
 			if err != nil {
-				return err
+				r.radioLogger.Println("unable to set function", funcValue, err)
 			}
 		} else {
-			r.logger.Println("radio does not support setting function", funcName)
+			r.radioLogger.Println("radio does not support setting function", funcName)
 		}
 
-		// verify and read the current value
+		// before we can verify the function's value we have to check that
+		// the radio can actually get this function
 		if utils.StringInSlice(funcName, r.rig.Caps.GetFunctions) {
 			cfmFuncValue, err := r.rig.GetFunc(vfo, funcValue)
 			if err != nil {
-				return err
+				r.radioLogger.Println("unable to verify function", funcValue, err)
+				continue
 			}
 			r.state.Vfo.Functions[funcName] = cfmFuncValue
 		}
@@ -603,39 +622,53 @@ func (r *radio) updateFunctions(newFuncs map[string]bool) error {
 func (r *radio) updateLevels(newLevels map[string]float32) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
-	for k, v := range newLevels {
-		levelValue, ok := hl.LevelValue[k]
+	// iterate over all new Levels in the map
+	for levelName, newLevel := range newLevels {
+
+		hlLevel, ok := hl.LevelValue[levelName]
 		if !ok {
-			return errors.New("unknown Level")
-		}
-		if _, ok := r.state.Vfo.Levels[k]; !ok {
-			return errors.New("unsupported Level for this rig")
+			r.radioLogger.Println("unknown level", levelName)
+			continue
 		}
 
-		if r.state.Vfo.Levels[k] != v {
-			err := r.rig.SetLevel(vfo, levelValue, v)
+		hasSetLevel := false
+		for _, setLevel := range r.rig.Caps.SetLevels {
+			if setLevel.Name == levelName {
+				hasSetLevel = true
+				break
+			}
+		}
+		if !hasSetLevel {
+			r.radioLogger.Println("radio does not support setting the level", levelName)
+			continue
+		}
+
+		if r.state.Vfo.Levels[levelName] != newLevel {
+
+			err := r.rig.SetLevel(vfo, hlLevel, newLevel)
 			if err != nil {
-				return nil
+				r.radioLogger.Println("unable to set level", levelName)
 			}
+		}
 
-			// lets verify if the value has been set
-			gl, err := r.rig.HasGetLevel(levelValue)
+		// before we can verify the level we have to check that
+		// the radio can actually get this level
+
+		hasGetLevel := false
+		for _, getLevel := range r.rig.Caps.GetLevels {
+			if getLevel.Name == levelName {
+				hasGetLevel = true
+				break
+			}
+		}
+
+		if hasGetLevel {
+			cfmLevel, err := r.rig.GetLevel(vfo, hlLevel)
 			if err != nil {
-				return err
+				r.radioLogger.Println("unable to verify level", levelName)
+				continue
 			}
-
-			if gl == levelValue {
-				gv, err := r.rig.GetLevel(vfo, levelValue)
-				if err != nil {
-					return err
-				}
-				// allow some rounding when comparing floats
-				if math.Abs(float64(gv))-math.Abs(float64(v)) > 0.1 {
-					r.logger.Printf("WARN: Level %s could not be set", k)
-				}
-				r.state.Vfo.Levels[k] = gv
-			}
-
+			r.state.Vfo.Levels[levelName] = cfmLevel
 		}
 	}
 
@@ -645,19 +678,53 @@ func (r *radio) updateLevels(newLevels map[string]float32) error {
 func (r *radio) updateParams(newParams map[string]float32) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
-	for k, v := range newParams {
-		paramValue, ok := hl.ParmValue[k]
+	// iterate over all new Levels in the map
+	for parmName, newParm := range newParams {
+
+		hlParam, ok := hl.ParmValue[parmName]
 		if !ok {
-			return errors.New("unknown Parameter")
+			r.radioLogger.Println("unknown parameter", parmName)
+			continue
 		}
-		if _, ok := r.state.Vfo.Parameters[k]; !ok {
-			return errors.New("unsupported Parameter for this rig")
-		}
-		if r.state.Vfo.Levels[k] != v {
-			err := r.rig.SetLevel(vfo, paramValue, v)
-			if err != nil {
-				return nil
+
+		hasSetParm := false
+		for _, setParm := range r.rig.Caps.SetParameters {
+			if setParm.Name == parmName {
+				hasSetParm = true
+				break
 			}
+		}
+		if !hasSetParm {
+			r.radioLogger.Println("radio does not support setting the parameter", parmName)
+			continue
+		}
+
+		if r.state.Vfo.Parameters[parmName] != newParm {
+
+			err := r.rig.SetParm(vfo, hlParam, newParm)
+			if err != nil {
+				r.radioLogger.Println("unable to set parameter", parmName)
+			}
+		}
+
+		// before we can verify the parameter we have to check that
+		// the radio can actually get this parameter
+
+		hasGetParm := false
+		for _, getParm := range r.rig.Caps.GetParameters {
+			if getParm.Name == parmName {
+				hasGetParm = true
+				break
+			}
+		}
+
+		if hasGetParm {
+			cfmParm, err := r.rig.GetParm(vfo, hlParam)
+			if err != nil {
+				r.radioLogger.Println("unable to verify parameter", parmName)
+				continue
+			}
+			r.state.Vfo.Parameters[parmName] = cfmParm
 		}
 	}
 
@@ -666,6 +733,10 @@ func (r *radio) updateParams(newParams map[string]float32) error {
 
 func (r *radio) updatePowerOn(pwrOn bool) error {
 
+	if !r.rig.Caps.HasSetPowerStat || !r.rig.Caps.HasGetPowerStat {
+		return errors.New("radio doesn't support set/get powerstat")
+	}
+
 	var pwrStat int
 	if pwrOn {
 		pwrStat = hl.RIG_POWER_ON
@@ -673,12 +744,26 @@ func (r *radio) updatePowerOn(pwrOn bool) error {
 		pwrStat = hl.RIG_POWER_OFF
 	}
 
-	err := r.rig.SetPowerStat(pwrStat)
+	if err := r.rig.SetPowerStat(pwrStat); err != nil {
+		return err
+	}
+
+	// give the radio a little bit of time to turn on/off
+	time.Sleep(time.Millisecond * 500)
+
+	// verify powerstat
+	cfmPwrStat, err := r.rig.GetPowerStat()
 	if err != nil {
 		return err
 	}
 
-	r.state.RadioOn = pwrOn
+	if cfmPwrStat == hl.RIG_POWER_OFF {
+		r.state.RadioOn = false
+	} else if cfmPwrStat == hl.RIG_POWER_ON {
+		r.state.RadioOn = true
+	} else {
+		r.radioLogger.Println("unknown powerstat", cfmPwrStat)
+	}
 
 	return nil
 }
@@ -702,9 +787,6 @@ func (r *radio) updatePtt(ptt bool) error {
 	if err != nil {
 		return err
 	}
-
-	r.logger.Println("ptt should be:", ptt)
-	r.logger.Println("ptt is:", p)
 
 	if p == hl.RIG_PTT_ON {
 		r.state.Ptt = true

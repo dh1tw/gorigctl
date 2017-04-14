@@ -25,6 +25,7 @@ type MqttSettings struct {
 	ToDeserializeStatusCh       chan []byte
 	ToDeserializePingRequestCh  chan []byte
 	ToDeserializePingResponseCh chan []byte
+	ToDeserializeLogCh          chan []byte
 	ToWire                      chan IOMsg
 	Events                      *pubsub.PubSub
 	LastWill                    *LastWill
@@ -101,6 +102,10 @@ func MqttClient(s MqttSettings) {
 		} else if strings.Contains(msg.Topic(), "cat/pong") {
 
 			s.ToDeserializePingResponseCh <- msg.Payload()[:len(msg.Payload())]
+
+		} else if strings.Contains(msg.Topic(), "cat/log") {
+
+			s.ToDeserializeLogCh <- msg.Payload()[:len(msg.Payload())]
 		}
 
 	}
@@ -119,7 +124,7 @@ func MqttClient(s MqttSettings) {
 		for _, topic := range s.Topics {
 			if token := client.Subscribe(topic, 0, nil); token.Wait() &&
 				token.Error() != nil {
-				log.Println(token.Error())
+				s.Logger.Println(token.Error())
 			}
 		}
 		s.Events.Pub(CONNECTED, events.MqttConnStatus)
@@ -142,7 +147,7 @@ func MqttClient(s MqttSettings) {
 	client := mqtt.NewClient(opts)
 
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		log.Println(token.Error())
+		s.Logger.Println(token.Error())
 	}
 
 	for {
@@ -154,8 +159,8 @@ func MqttClient(s MqttSettings) {
 			}
 			return
 		case msg := <-s.ToWire:
-			// fmt.Println(msg.Topic, msg.Qos, msg.Retain, msg.Data)
 			token := client.Publish(msg.Topic, msg.Qos, msg.Retain, msg.Data)
+			token.WaitTimeout(time.Millisecond * 100)
 			token.Wait()
 
 			//indicates if cat data should be forwarded for decoding

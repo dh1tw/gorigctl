@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -15,6 +16,9 @@ import (
 	"github.com/dh1tw/gorigctl/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 // mqttCmd represents the mqtt command
@@ -34,6 +38,11 @@ func init() {
 }
 
 func guiCliClient(cmd *cobra.Command, args []string) {
+
+	// profiling server can be enabled through a hidden pflag
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6061", nil))
+	}()
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
@@ -65,23 +74,30 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 	serverCatRequestTopic := baseTopic + "/setstate"
 	serverStatusTopic := baseTopic + "/status"
 	serverPingTopic := baseTopic + "/ping"
-	// errorTopic := baseTopic + "/error"
+	serverLogTopic := baseTopic + "/log"
 
 	// tx topics
 	serverCatResponseTopic := baseTopic + "/state"
 	serverCapsTopic := baseTopic + "/caps"
 	serverPongTopic := baseTopic + "/pong"
 
-	mqttRxTopics := []string{serverCatResponseTopic, serverCapsTopic, serverPongTopic, serverStatusTopic}
+	mqttRxTopics := []string{
+		serverCatResponseTopic,
+		serverCapsTopic,
+		serverPongTopic,
+		serverStatusTopic,
+		serverLogTopic,
+	}
 
 	toWireCh := make(chan comms.IOMsg, 20)
-	toDeserializeCatResponseCh := make(chan []byte, 10)
-	toDeserializePingResponseCh := make(chan []byte, 10)
+	toDeserializeCatResponseCh := make(chan []byte, 50)
+	toDeserializePingResponseCh := make(chan []byte, 50)
 	toDeserializeCapsCh := make(chan []byte, 5)
 	toDeserializeStatusCh := make(chan []byte, 5)
+	toDeserializeLogCh := make(chan []byte, 10)
 
 	// Event PubSub
-	evPS := pubsub.New(10)
+	evPS := pubsub.New(10000)
 
 	// WaitGroup to coordinate a graceful shutdown
 	var wg sync.WaitGroup
@@ -109,16 +125,18 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 		ToDeserializeCapabilitiesCh: toDeserializeCapsCh,
 		ToDeserializeStatusCh:       toDeserializeStatusCh,
 		ToDeserializePingResponseCh: toDeserializePingResponseCh,
-		ToWire:   toWireCh,
-		Events:   evPS,
-		LastWill: nil,
-		Logger:   appLogger,
+		ToDeserializeLogCh:          toDeserializeLogCh,
+		ToWire:                      toWireCh,
+		Events:                      evPS,
+		LastWill:                    nil,
+		Logger:                      appLogger,
 	}
 
 	remoteRadioSettings := cligui.RemoteRadioSettings{
 		CatResponseCh:   toDeserializeCatResponseCh,
 		RadioStatusCh:   toDeserializeStatusCh,
 		CapabilitiesCh:  toDeserializeCapsCh,
+		RadioLogCh:      toDeserializeLogCh,
 		ToWireCh:        toWireCh,
 		CatRequestTopic: serverCatRequestTopic,
 		Events:          evPS,

@@ -411,7 +411,7 @@ func setPowerStat(r *remoteRadio, args []string) {
 
 	power, err := strconv.ParseBool(args[0])
 	if err != nil {
-		r.logger.Println("ERROR: power value must be of type bool (1,t,true / 0,f,false")
+		r.logger.Println("ERROR: power value must be of type bool (1,t,true / 0,f,false)")
 		return
 	}
 
@@ -435,7 +435,7 @@ func setPtt(r *remoteRadio, args []string) {
 
 	ptt, err := strconv.ParseBool(args[0])
 	if err != nil {
-		r.logger.Println("ERROR: ptt value must be of type bool (1,t,true / 0,f,false")
+		r.logger.Println("ERROR: ptt value must be of type bool (1,t,true / 0,f,false)")
 		return
 	}
 
@@ -494,7 +494,7 @@ func setFunction(r *remoteRadio, args []string) {
 
 	value, err := strconv.ParseBool(args[1])
 	if err != nil {
-		r.logger.Println("ERROR: function value must be of type bool (1,t,true / 0,f,false")
+		r.logger.Println("ERROR: function value must be of type bool (1,t,true / 0,f,false)")
 		return
 	}
 
@@ -525,7 +525,7 @@ func setSplitVfo(r *remoteRadio, args []string) {
 
 	splitEnabled, err := strconv.ParseBool(args[0])
 	if err != nil {
-		r.logger.Println("ERROR: split enable/disable value must be of type bool (1,t,true / 0,f,false")
+		r.logger.Println("ERROR: split enable/disable value must be of type bool (1,t,true / 0,f,false)")
 		return
 	}
 
@@ -734,7 +734,7 @@ func setPrintRigUpdates(r *remoteRadio, args []string) {
 
 	ru, err := strconv.ParseBool(args[0])
 	if err != nil {
-		r.logger.Println("ERROR: value must be of type bool (1,t,true / 0,f,false")
+		r.logger.Println("ERROR: value must be of type bool (1,t,true / 0,f,false)")
 		return
 	}
 
