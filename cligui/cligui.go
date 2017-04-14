@@ -97,7 +97,11 @@ func HandleRemoteRadio(rs RemoteRadioSettings) {
 			ui.SendCustomEvt("/radio/caps", r.caps)
 
 		case msg := <-rs.CatResponseCh:
-			r.deserializeCatResponse(msg)
+			r.printRigUpdates = true
+			err := r.deserializeCatResponse(msg)
+			if err != nil {
+				ui.SendCustomEvt("/log/msg", err.Error())
+			}
 			ui.SendCustomEvt("/radio/state", r.state)
 
 		case msg := <-rs.RadioStatusCh:
@@ -139,8 +143,8 @@ func (r *remoteRadio) deserializeRadioStatus(data []byte) error {
 		return err
 	}
 
-	if r.radioOnline != rStatus.GetOnline() {
-		r.radioOnline = rStatus.GetOnline()
+	if r.radioOnline != rStatus.Online {
+		r.radioOnline = rStatus.Online
 		r.logger.Println("Radio Online:", r.radioOnline)
 	}
 
@@ -239,7 +243,7 @@ func (r *remoteRadio) deserializeCatResponse(msg []byte) error {
 		if ns.Vfo.GetSplit() != nil {
 			if !reflect.DeepEqual(ns.Vfo.GetSplit(), r.state.Vfo.Split) {
 				if err := r.updateSplit(ns.Vfo.Split); err != nil {
-					log.Println(err)
+					r.logger.Println(err)
 				}
 			}
 		}
@@ -251,27 +255,21 @@ func (r *remoteRadio) deserializeCatResponse(msg []byte) error {
 			}
 		}
 
-		if ns.Vfo.Functions != nil {
-			if !reflect.DeepEqual(ns.Vfo.Functions, r.state.Vfo.Functions) {
-				if err := r.updateFunctions(ns.Vfo.GetFunctions()); err != nil {
-					log.Println(err)
-				}
+		if !reflect.DeepEqual(ns.GetVfo().GetFunctions(), r.state.Vfo.Functions) {
+			if err := r.updateFunctions(ns.Vfo.GetFunctions()); err != nil {
+				r.logger.Println(err)
 			}
 		}
 
-		if ns.Vfo.Levels != nil {
-			if !reflect.DeepEqual(ns.Vfo.Levels, r.state.Vfo.Levels) {
-				if err := r.updateLevels(ns.Vfo.GetLevels()); err != nil {
-					log.Println(err)
-				}
+		if !reflect.DeepEqual(ns.GetVfo().GetLevels(), r.state.Vfo.Levels) {
+			if err := r.updateLevels(ns.Vfo.GetLevels()); err != nil {
+				r.logger.Println(err)
 			}
 		}
 
-		if ns.Vfo.Parameters != nil {
-			if !reflect.DeepEqual(ns.Vfo.Parameters, r.state.Vfo.Parameters) {
-				if err := r.updateParams(ns.Vfo.GetParameters()); err != nil {
-					log.Println(err)
-				}
+		if !reflect.DeepEqual(ns.GetVfo().GetParameters(), r.state.Vfo.Parameters) {
+			if err := r.updateParams(ns.Vfo.GetParameters()); err != nil {
+				r.logger.Println(err)
 			}
 		}
 
@@ -345,6 +343,12 @@ func (r *remoteRadio) updateSplit(newSplit *sbRadio.Split) error {
 func (r *remoteRadio) updateFunctions(newFuncs map[string]bool) error {
 
 	r.state.Vfo.Functions = newFuncs
+	if r.printRigUpdates {
+		r.logger.Println("Updated functions:")
+		for name, value := range r.state.Vfo.Functions {
+			r.logger.Printf("%v: %v", name, value)
+		}
+	}
 
 	// vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
@@ -381,6 +385,13 @@ func (r *remoteRadio) updateLevels(newLevels map[string]float32) error {
 
 	r.state.Vfo.Levels = newLevels
 
+	if r.printRigUpdates {
+		r.logger.Println("Updated levels:")
+		for name, value := range r.state.Vfo.Levels {
+			r.logger.Printf("%v: %v", name, value)
+		}
+	}
+
 	// vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
 	// for k, v := range newLevels {
@@ -406,6 +417,13 @@ func (r *remoteRadio) updateLevels(newLevels map[string]float32) error {
 func (r *remoteRadio) updateParams(newParams map[string]float32) error {
 
 	r.state.Vfo.Parameters = newParams
+
+	if r.printRigUpdates {
+		r.logger.Println("Updated parameters:")
+		for name, value := range r.state.Vfo.Parameters {
+			r.logger.Printf("%v: %v", name, value)
+		}
+	}
 
 	// vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 

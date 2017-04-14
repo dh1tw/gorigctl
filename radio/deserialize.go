@@ -22,11 +22,9 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 		if ns.GetRadioOn() != r.state.RadioOn {
 			if err := r.updatePowerOn(ns.GetRadioOn()); err != nil {
 				r.radioLogger.Println(err)
-			} else {
-				if r.state.RadioOn {
-					r.queryVfo()
-				}
 			}
+
+			return nil
 		}
 	}
 
@@ -758,9 +756,15 @@ func (r *radio) updatePowerOn(pwrOn bool) error {
 	}
 
 	if cfmPwrStat == hl.RIG_POWER_OFF {
-		r.state.RadioOn = false
+		r.state = sbRadio.State{}
+		r.state.Vfo = &sbRadio.Vfo{}
+		r.state.Channel = &sbRadio.Channel{}
+		r.state.Vfo.Split = &sbRadio.Split{}
+		r.state.Vfo.Levels = make(map[string]float32)
+		r.state.Vfo.Parameters = make(map[string]float32)
+		r.state.Vfo.Functions = make(map[string]bool)
 	} else if cfmPwrStat == hl.RIG_POWER_ON {
-		r.state.RadioOn = true
+		r.queryVfo()
 	} else {
 		r.radioLogger.Println("unknown powerstat", cfmPwrStat)
 	}

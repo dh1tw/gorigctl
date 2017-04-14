@@ -24,6 +24,7 @@ type radioGui struct {
 	levels               *ui.List
 	levelsData           []GuiLevel
 	parameters           *ui.List
+	parametersData       []GuiLevel
 	frequency            *CharField
 	frequencyInitialized bool
 	sMeter               *ui.Gauge
@@ -61,6 +62,7 @@ func (rg *radioGui) init() {
 	rg.internalFreq = 0.0
 	rg.lastFreqChange = time.Now()
 	rg.radioOnline = false
+	rg.functionsData = make([]GuiFunction, 0, 32)
 
 	rg.latencySpark = ui.NewSparkline()
 	rg.latencySpark.Title = "Offline"
@@ -87,7 +89,6 @@ func (rg *radioGui) init() {
 	rg.functions = ui.NewList()
 	rg.functions.BorderLabel = "Functions"
 	rg.functions.Height = 10
-	rg.functionsData = make([]GuiFunction, 0, 32)
 
 	rg.levels = ui.NewList()
 	rg.levels.BorderLabel = "Levels"
@@ -95,9 +96,9 @@ func (rg *radioGui) init() {
 	rg.levelsData = make([]GuiLevel, 0, 32)
 
 	rg.parameters = ui.NewList()
-	rg.parameters.Items = []string{""}
 	rg.parameters.BorderLabel = "Parameters"
 	rg.parameters.Height = 10
+	rg.parametersData = make([]GuiLevel, 0, 32)
 
 	rg.frequency = NewCharField("")
 	rg.frequency.BorderLabel = "Frequency"
@@ -265,22 +266,19 @@ func (rg *radioGui) calcLogWindowHeight() int {
 
 func (rg *radioGui) updateCaps(ev ui.Event) {
 
-	// this event could still thrown by a retained
-	// caps message
-	// if !rg.radioOnline {
-	// 	return
-	// }
-
 	rg.caps = ev.Data.(sbRadio.Capabilities)
 
-	// update GUI Layout
-	rg.operations.Height = 2 + len(rg.caps.VfoOps)
-	rg.parameters.Height = 2 + len(rg.caps.GetParameters)
-	rg.log.Height = rg.calcLogWindowHeight()
+	rg.parametersData = make([]GuiLevel, 0, 32)
+	rg.functionsData = make([]GuiFunction, 0, 32)
+	rg.levelsData = make([]GuiLevel, 0, 32)
 
 	// update widgets
 	rg.info.Items[0] = rg.caps.MfgName + " " + rg.caps.ModelName
 	rg.info.Items[1] = rg.caps.Version + " " + rg.caps.Status
+
+	// update GUI Layout
+	rg.operations.Height = 2 + len(rg.caps.VfoOps)
+	rg.parameters.Height = 2 + len(rg.caps.GetParameters)
 
 	for _, funcName := range rg.caps.GetFunctions {
 		fData := GuiFunction{Label: funcName}
@@ -328,183 +326,379 @@ func (rg *radioGui) updateCaps(ev ui.Event) {
 
 	rg.operations.Items = rg.caps.VfoOps
 
+	rg.log.Height = rg.calcLogWindowHeight()
+
 	if !rg.caps.HasPowerstat {
 		rg.powerOn.Text = "n/a"
 	}
 
-	rg.drawState()
 	ui.Clear()
 	ui.Body.Align()
 	ui.Render(ui.Body)
+	rg.updateGUI()
 }
 
 func (rg *radioGui) addLogEntry(ev ui.Event) {
 	msg := ev.Data.(string)
+	if len(rg.log.Items) >= rg.log.Height-2 {
+		rg.log.Items = rg.log.Items[1:]
+	}
 	rg.log.Items = append(rg.log.Items, msg)
 	ui.Render(rg.log)
 }
 
 func (rg *radioGui) updateState(ev ui.Event) {
 
-	// this event could still thrown by a retained
-	// state message
-	// if !rg.radioOnline {
-	// 	return
-	// }
-
 	rg.state = ev.Data.(sbRadio.State)
-	rg.drawState()
 
+	if !rg.radioOnline {
+		return
+	}
+
+	rg.updateGUI()
 }
 
-func (rg *radioGui) drawState() {
+func (rg *radioGui) updateGUI() {
+
+	powerOn := true
+
+	// ui.SendCustomEvt("/log/msg", "called drawState()")
+	// this event could still thrown by a retained
+	// state message; if the radio doesn't support powerstat
+	// we try to render it anyway
+	if rg.caps.HasPowerstat && !rg.state.RadioOn {
+		rg.clear()
+		rg.frequency.Text = "RADIO OFF"
+		rg.powerOn.Bg = ui.ColorDefault
+		ui.Render(rg.frequency, rg.powerOn)
+		powerOn = false
+	}
+
 	if !rg.frequencyInitialized {
 		rg.internalFreq = rg.state.Vfo.Frequency
 		rg.frequencyInitialized = true
 		rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
 	}
 
-	rg.mode.Text = rg.state.Vfo.Mode
-	rg.filter.Text = fmt.Sprintf("%v Hz", rg.state.Vfo.PbWidth)
-	rg.vfo.Text = rg.state.CurrentVfo
-	rg.rit.Text = fmt.Sprintf("%v Hz", rg.state.Vfo.Rit)
-	if rg.state.Vfo.Rit != 0 {
-		rg.rit.TextBgColor = ui.ColorGreen
-		rg.rit.Bg = ui.ColorGreen
+	rg.setVfo(rg.state.CurrentVfo)
+	rg.setMode(rg.state.Vfo.Mode)
+	rg.setFilter(powerOn, rg.state.Vfo.PbWidth)
+	rg.setRit(powerOn, rg.state.Vfo.Rit)
+	rg.setXit(powerOn, rg.state.Vfo.Xit)
+	splitEnabled := rg.state.Vfo.Split.Enabled
+	rg.setSplitVfo(splitEnabled, rg.state.Vfo.Split.Vfo)
+	rg.setTxMode(splitEnabled, rg.state.Vfo.Split.Mode)
+	rg.setTxFrequency(splitEnabled, rg.state.Vfo.Split.Frequency)
+	rg.setTxFilter(splitEnabled, rg.state.Vfo.Split.PbWidth)
+	rg.setPtt(rg.state.Ptt)
+	rg.setAntenna(powerOn, rg.state.Vfo.Ant)
+	rg.setPowerOn(rg.state.RadioOn)
+
+	ptt := rg.state.Ptt
+
+	if swrValue, ok := rg.state.Vfo.Levels["SWR"]; ok {
+		rg.setSwrMeter(ptt, swrValue)
+	}
+
+	if powerValue, ok := rg.state.Vfo.Levels["METER"]; ok {
+		rg.setPowerMeter(ptt, powerValue)
+	}
+
+	if sMeterValue, ok := rg.state.Vfo.Levels["STRENGTH"]; ok {
+		rg.setSMeter(ptt, sMeterValue)
+	}
+
+	if attValue, ok := rg.state.Vfo.Levels["ATT"]; ok {
+		rg.setAttenuator(powerOn, attValue)
 	} else {
+		rg.setAttenuator(false, 0)
+	}
+
+	if preampValue, ok := rg.state.Vfo.Levels["PREAMP"]; ok {
+		rg.setPreamp(powerOn, preampValue)
+	} else {
+		rg.setPreamp(false, 0)
+	}
+
+	// fmt.Println(rg.state.Vfo.Functions)
+	rg.setFunctions(rg.state.Vfo.Functions)
+	rg.setLevels(rg.state.Vfo.Levels)
+	rg.setParameters(rg.state.Vfo.Parameters)
+}
+
+func (rg *radioGui) clear() {
+
+	rg.internalFreq = 0.0
+
+	for i := range rg.levelsData {
+		rg.levelsData[i].Value = 0.0
+	}
+
+	for i := range rg.functionsData {
+		rg.functionsData[i].Set = false
+	}
+
+	for i := range rg.parametersData {
+		rg.parametersData[i].Value = 0.0
+	}
+}
+
+func (rg *radioGui) setVfo(vfo string) {
+	rg.vfo.Text = vfo
+	ui.Render(rg.vfo)
+}
+
+func (rg *radioGui) setMode(mode string) {
+	rg.mode.Text = rg.state.Vfo.Mode
+	ui.Render(rg.mode)
+}
+
+func (rg *radioGui) setFilter(powerOn bool, filter int32) {
+	if powerOn {
+		rg.filter.Text = fmt.Sprintf("%v Hz", filter)
+	} else {
+		rg.filter.Text = ""
+	}
+	ui.Render(rg.filter)
+}
+
+func (rg *radioGui) setRit(powerOn bool, rit int32) {
+	if powerOn {
+		rg.rit.Text = fmt.Sprintf("%v Hz", rit)
+		if rg.state.Vfo.Rit != 0 {
+			rg.rit.TextBgColor = ui.ColorGreen
+			rg.rit.Bg = ui.ColorGreen
+		} else {
+			rg.rit.TextBgColor = ui.ColorDefault
+			rg.rit.Bg = ui.ColorDefault
+		}
+	} else {
+		rg.rit.Text = ""
 		rg.rit.TextBgColor = ui.ColorDefault
 		rg.rit.Bg = ui.ColorDefault
 	}
+	ui.Render(rg.rit)
+}
 
-	rg.xit.Text = fmt.Sprintf("%v Hz", rg.state.Vfo.Xit)
-	if rg.state.Vfo.Xit != 0 {
-		rg.xit.TextBgColor = ui.ColorRed
-		rg.xit.Bg = ui.ColorRed
+func (rg *radioGui) setXit(powerOn bool, xit int32) {
+	if powerOn {
+		rg.xit.Text = fmt.Sprintf("%v Hz", xit)
+		if rg.state.Vfo.Xit != 0 {
+			rg.xit.TextBgColor = ui.ColorRed
+			rg.xit.Bg = ui.ColorRed
+		} else {
+			rg.xit.TextBgColor = ui.ColorDefault
+			rg.xit.Bg = ui.ColorDefault
+		}
 	} else {
+		rg.xit.Text = ""
 		rg.xit.TextBgColor = ui.ColorDefault
 		rg.xit.Bg = ui.ColorDefault
 	}
+	ui.Render(rg.xit)
+}
 
-	rg.antenna.Text = fmt.Sprintf("%v", rg.state.Vfo.Ant)
+func (rg *radioGui) setAntenna(powerOn bool, ant int32) {
+	if powerOn {
+		rg.antenna.Text = fmt.Sprintf("%v", ant)
+	} else {
+		rg.antenna.Text = fmt.Sprintf("")
+	}
+	ui.Render(rg.antenna)
+}
 
-	// rg.attenuator = fmt.Sprintf("%v dB", rg.state.Vfo.Attenuator)
-	// rg.preamp = fmt.Sprintf("%v dB", rg.state.Vfo.Preamp)
-
-	if rg.state.Ptt {
+func (rg *radioGui) setPtt(ptt bool) {
+	if ptt {
 		rg.ptt.Bg = ui.ColorRed
 	} else {
 		rg.ptt.Bg = ui.ColorDefault
 	}
-	if rg.state.RadioOn {
+	ui.Render(rg.ptt)
+}
+
+func (rg *radioGui) setPowerOn(powerOn bool) {
+	if powerOn {
 		rg.powerOn.Bg = ui.ColorGreen
 	} else {
 		rg.powerOn.Bg = ui.ColorDefault
 	}
-	if rg.state.Vfo.Split.Enabled {
-		if rg.state.Vfo.Split.Vfo != "" {
-			rg.split.Text = rg.state.Vfo.Split.Vfo
+	ui.Render(rg.powerOn)
+}
+
+func (rg *radioGui) setSplitVfo(enabled bool, txVfo string) {
+	if enabled {
+		if txVfo != "" {
+			rg.split.Text = txVfo
+			rg.split.TextBgColor = ui.ColorGreen
+			rg.split.Bg = ui.ColorGreen
 		} else {
 			rg.split.Text = "n/a"
-		}
-		rg.split.TextBgColor = ui.ColorGreen
-		rg.split.Bg = ui.ColorGreen
-		if rg.state.Vfo.Split.Frequency > 0 {
-			rg.txFrequency.Text = fmt.Sprintf("%.2f kHz", rg.state.Vfo.Split.Frequency/1000)
-		} else {
-			rg.txFrequency.Text = "n/a"
-		}
-		if rg.state.Vfo.Split.Mode != "" {
-			rg.txMode.Text = rg.state.Vfo.Split.Mode
-		} else {
-			rg.txMode.Text = "n/a"
-		}
-		if rg.state.Vfo.Split.PbWidth > 0 {
-			rg.txFilter.Text = fmt.Sprintf("%v Hz", rg.state.Vfo.Split.PbWidth)
-		} else {
-			rg.txFilter.Text = "n/a"
+			rg.split.TextBgColor = ui.ColorDefault
+			rg.split.Bg = ui.ColorDefault
 		}
 	} else {
-		rg.split.Bg = ui.ColorDefault
-		rg.split.TextBgColor = ui.ColorDefault
 		rg.split.Text = ""
-		rg.txFrequency.Text = ""
-		rg.txMode.Text = ""
-		rg.txFilter.Text = ""
+		rg.split.TextBgColor = ui.ColorDefault
+		rg.split.Bg = ui.ColorDefault
 	}
-	if rg.state.Ptt {
-		rg.sMeter.Percent = 0
-		rg.sMeter.Label = ""
-		if pValue, ok := rg.state.Vfo.Levels["METER"]; ok {
-			rg.powerMeter.Label = fmt.Sprintf("%vW", pValue)
-		}
-		if swrValue, ok := rg.state.Vfo.Levels["SWR"]; ok {
-			rg.swrMeter.Label = fmt.Sprintf("1:%.2f", swrValue)
-		}
+	ui.Render(rg.split)
+}
+
+func (rg *radioGui) setTxFrequency(enabled bool, txFreq float64) {
+	if txFreq > 0 {
+		rg.txFrequency.Text = fmt.Sprintf("%.2f kHz", txFreq/1000)
 	} else {
-		rg.powerMeter.Percent = 0
+		if enabled {
+			// rig does can not supply txFrequency
+			rg.txFrequency.Text = "n/a"
+		} else {
+			rg.txFrequency.Text = ""
+		}
+	}
+	ui.Render(rg.txFrequency)
+}
+
+func (rg *radioGui) setTxMode(enabled bool, mode string) {
+	if mode != "" {
+		rg.txMode.Text = mode
+	} else {
+		if enabled {
+			// rig can not supply txMode
+			rg.txMode.Text = "n/a"
+		} else {
+			rg.txMode.Text = ""
+		}
+	}
+	ui.Render(rg.txMode)
+}
+
+func (rg *radioGui) setTxFilter(enabled bool, pbWidth int32) {
+	if pbWidth > 0 {
+		rg.txFilter.Text = fmt.Sprintf("%v Hz", pbWidth)
+	} else {
+		if enabled {
+			// rig can not supply txFilter
+			rg.txFilter.Text = "n/a"
+		} else {
+			rg.txFilter.Text = ""
+		}
+	}
+	ui.Render(rg.txFilter)
+}
+
+func (rg *radioGui) setPowerMeter(ptt bool, value float32) {
+	if ptt && value > 0 {
+		rg.powerMeter.Percent = int(value * 100)
+		rg.powerMeter.Label = fmt.Sprintf("%v Watt", value)
+	} else {
 		rg.powerMeter.Label = ""
 		rg.powerMeter.Percent = 0
+	}
+	ui.Render(rg.powerMeter)
+}
+
+func (rg *radioGui) setSwrMeter(ptt bool, value float32) {
+	if ptt && value > 0 {
+		rg.swrMeter.Percent = int(value * 100)
+		rg.swrMeter.Label = fmt.Sprintf("1:%.f2", value)
+	} else {
 		rg.swrMeter.Label = ""
-		if sValue, ok := rg.state.Vfo.Levels["STRENGTH"]; ok {
-			if sValue < 0 {
-				s := int((59 - sValue*-1) / 6)
-				rg.sMeter.Label = fmt.Sprintf("S%v", s)
-				rg.sMeter.Percent = int((59 - sValue*-1) * 100 / 114)
-			} else {
-				rg.sMeter.Label = fmt.Sprintf("S9+%vdB", int(sValue))
-				rg.sMeter.Percent = int((sValue + 59) * 100 / 114)
-			}
+		rg.swrMeter.Percent = 0
+	}
+	ui.Render(rg.swrMeter)
+}
+
+func (rg *radioGui) setSMeter(ptt bool, value float32) {
+	if !ptt {
+		if value < 0 {
+			s := int((59 - value*-1) / 6)
+			rg.sMeter.Label = fmt.Sprintf("S%v", s)
+			rg.sMeter.Percent = int((59 - value*-1) * 100 / 114)
+		} else {
+			rg.sMeter.Label = fmt.Sprintf("S9+%vdB", int(value))
+			rg.sMeter.Percent = int((value + 59) * 100 / 114)
 		}
+	} else {
+		rg.sMeter.Label = ""
+		rg.sMeter.Percent = 0
 	}
 
-	if attValue, ok := rg.state.Vfo.Levels["ATT"]; ok {
-		if attValue > 0 {
-			rg.attenuator.Text = fmt.Sprintf("-%.0f dB", attValue)
+	ui.Render(rg.sMeter)
+}
+
+func (rg *radioGui) setAttenuator(powerOn bool, value float32) {
+	if powerOn {
+		if value > 0 {
+			rg.attenuator.Text = fmt.Sprintf("-%.0f dB", value)
 			rg.attenuator.Bg = ui.ColorGreen
 			rg.attenuator.TextBgColor = ui.ColorGreen
 		} else {
-			rg.attenuator.Text = fmt.Sprintf("%.0f dB", attValue)
+			rg.attenuator.Text = fmt.Sprintf("%.0f dB", value)
 			rg.attenuator.Bg = ui.ColorDefault
 			rg.attenuator.TextBgColor = ui.ColorDefault
 		}
 	} else {
-		rg.attenuator.Text = "n/a"
+		rg.attenuator.Text = ""
 		rg.attenuator.Bg = ui.ColorDefault
 		rg.attenuator.TextBgColor = ui.ColorDefault
 	}
+	ui.Render(rg.attenuator)
+}
 
-	if preampValue, ok := rg.state.Vfo.Levels["PREAMP"]; ok {
-		rg.preamp.Text = fmt.Sprintf("%.0f dB", preampValue)
-		if preampValue > 0 {
+func (rg *radioGui) setPreamp(powerOn bool, value float32) {
+	if powerOn {
+		if value > 0 {
+			rg.preamp.Text = fmt.Sprintf("-%.0f dB", value)
 			rg.preamp.Bg = ui.ColorGreen
 			rg.preamp.TextBgColor = ui.ColorGreen
 		} else {
+			rg.preamp.Text = fmt.Sprintf("%.0f dB", value)
 			rg.preamp.Bg = ui.ColorDefault
 			rg.preamp.TextBgColor = ui.ColorDefault
 		}
 	} else {
-		rg.preamp.Text = "n/a"
+		rg.preamp.Text = ""
 		rg.preamp.Bg = ui.ColorDefault
 		rg.preamp.TextBgColor = ui.ColorDefault
 	}
+	ui.Render(rg.preamp)
+}
+
+func (rg *radioGui) setFunctions(functions map[string]bool) {
+	for i, f := range rg.functionsData {
+		if _, ok := functions[f.Label]; ok {
+			rg.functionsData[i].Set = functions[f.Label]
+		}
+	}
+	rg.functions.Items = SprintFunctions(rg.functionsData)
+	ui.Render(rg.functions)
+
+}
+
+func (rg *radioGui) setLevels(levels map[string]float32) {
 
 	for i, el := range rg.levelsData {
-		for name, value := range rg.state.Vfo.Levels {
+		for name, value := range levels {
 			if el.Label == name {
 				rg.levelsData[i].Value = value
 			}
 		}
 	}
 	rg.levels.Items = SprintLevels(rg.levelsData)
+	ui.Render(rg.levels)
+}
 
-	for i, el := range rg.functionsData {
-		if _, ok := rg.state.Vfo.Functions[el.Label]; ok {
-			rg.functionsData[i].Set = rg.state.Vfo.Functions[el.Label]
+func (rg *radioGui) setParameters(parameters map[string]float32) {
+
+	for i, el := range rg.parametersData {
+		for name, value := range parameters {
+			if el.Label == name {
+				rg.parametersData[i].Value = value
+			}
 		}
 	}
-	rg.functions.Items = SprintFunctions(rg.functionsData)
-
-	ui.Render(ui.Body)
+	rg.parameters.Items = SprintLevels(rg.parametersData)
+	ui.Render(rg.parameters)
 }
 
 // updateLatency updates the Latency chart (2 way ping)
@@ -523,8 +717,9 @@ func (rg *radioGui) updateLatency(ev ui.Event) {
 func (rg *radioGui) updateRadioStatus(ev ui.Event) {
 	if ev.Data.(bool) {
 		//we should update the entire GUI
-		rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
+		// rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
 		rg.radioOnline = true
+		rg.updateGUI()
 	} else {
 		// this is a hack to remove artifacts from the
 		// log widget when the canvas shrinks after
@@ -538,18 +733,20 @@ func (rg *radioGui) updateRadioStatus(ev ui.Event) {
 }
 
 func (rg *radioGui) syncFrequency(ev ui.Event) {
-	if rg.radioOnline {
-		// if rg.state.RadioOn {
-		if time.Since(rg.lastFreqChange) > time.Millisecond*300 {
-			rg.internalFreq = rg.state.Vfo.Frequency
-			rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
-		}
-		// } else {
-		// 	rg.frequency.Text = "RADIO OFF"
-		// }
-	} else {
-		rg.frequency.Text = "RADIO OFFLINE"
+
+	if !rg.radioOnline {
+		return
 	}
+
+	if rg.caps.HasPowerstat && !rg.state.RadioOn {
+		return
+	}
+
+	if time.Since(rg.lastFreqChange) > time.Millisecond*300 {
+		rg.internalFreq = rg.state.Vfo.Frequency
+		rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
+	}
+
 	ui.Render(rg.frequency)
 }
 
@@ -566,28 +763,30 @@ func guiLoop(caps sbRadio.Capabilities, evPS *pubsub.PubSub) {
 	ui.Handle("/timer/1s", rg.syncFrequency)
 
 	ui.Handle("/sys/kbd/<up>", func(ui.Event) {
-		// if rg.radioOnline && rg.state.RadioOn {
-		if rg.radioOnline && rg.state.RadioOn {
-			rg.internalFreq += float64(rg.state.Vfo.TuningStep)
-			freq := rg.internalFreq / 1000
-			cmd := []string{"set_freq", fmt.Sprintf("%.2f", freq)}
-			evPS.Pub(cmd, events.CliInput)
-			rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
-			ui.Render(rg.frequency)
-			rg.lastFreqChange = time.Now()
+		if rg.radioOnline {
+			if (rg.caps.HasPowerstat && rg.state.RadioOn) || !rg.caps.HasPowerstat {
+				rg.internalFreq += float64(rg.state.Vfo.TuningStep)
+				freq := rg.internalFreq / 1000
+				cmd := []string{"set_freq", fmt.Sprintf("%.2f", freq)}
+				evPS.Pub(cmd, events.CliInput)
+				rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
+				ui.Render(rg.frequency)
+				rg.lastFreqChange = time.Now()
+			}
 		}
 	})
 
 	ui.Handle("/sys/kbd/<down>", func(ui.Event) {
-		// if rg.radioOnline && rg.state.RadioOn {
-		if rg.radioOnline && rg.state.RadioOn {
-			rg.internalFreq -= float64(rg.state.Vfo.TuningStep)
-			freq := rg.internalFreq / 1000
-			cmd := []string{"set_freq", fmt.Sprintf("%.2f", freq)}
-			evPS.Pub(cmd, events.CliInput)
-			rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
-			ui.Render(rg.frequency)
-			rg.lastFreqChange = time.Now()
+		if rg.radioOnline {
+			if (rg.radioOnline && rg.state.RadioOn) || !rg.caps.HasPowerstat {
+				rg.internalFreq -= float64(rg.state.Vfo.TuningStep)
+				freq := rg.internalFreq / 1000
+				cmd := []string{"set_freq", fmt.Sprintf("%.2f", freq)}
+				evPS.Pub(cmd, events.CliInput)
+				rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
+				ui.Render(rg.frequency)
+				rg.lastFreqChange = time.Now()
+			}
 		}
 	})
 
@@ -641,19 +840,21 @@ func SprintFunctions(fs []GuiFunction) []string {
 	return s
 }
 
-func SprintLevels(lv []GuiLevel) []string {
-	s := make([]string, 0, len(lv))
-	for _, el := range lv {
-		item := el.Label
+func SprintLevels(levels []GuiLevel) []string {
+	s := make([]string, 0, len(levels))
+
+	for _, level := range levels {
+		item := level.Label
+		// add some spacing
 		for i := len(item); i < 13; i++ {
 			item = item + " "
 		}
-		if el.SetOnly {
+		if level.SetOnly {
 			item = item + fmt.Sprint("SetOnly")
 		} else {
-			intr, frac := math.Modf(float64(el.Value))
+			intr, frac := math.Modf(float64(level.Value))
 			if frac > 0 {
-				item = item + fmt.Sprintf("%.2f", el.Value)
+				item = item + fmt.Sprintf("%.2f", level.Value)
 			} else {
 				item = item + fmt.Sprintf("%.0f", intr)
 			}

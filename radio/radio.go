@@ -31,14 +31,15 @@ type RadioSettings struct {
 }
 
 type radio struct {
-	rig           hl.Rig
-	state         sbRadio.State
-	settings      *RadioSettings
-	pollingTicker *time.Ticker
-	radioLogger   *log.Logger
-	appLogger     *log.Logger
-	lastUpdate    time.Time
-	updateTicker  *time.Ticker
+	rig            hl.Rig
+	state          sbRadio.State
+	settings       *RadioSettings
+	pollingTicker  *time.Ticker
+	radioLogger    *log.Logger
+	appLogger      *log.Logger
+	lastUpdateSent time.Time
+	lastCmdRecvd   time.Time
+	updateTicker   *time.Ticker
 }
 
 func HandleRadio(rs RadioSettings) {
@@ -51,6 +52,9 @@ func HandleRadio(rs RadioSettings) {
 	r.rig = hl.Rig{}
 	r.state = sbRadio.State{}
 	r.state.Vfo = &sbRadio.Vfo{}
+	r.state.Vfo.Levels = make(map[string]float32)
+	r.state.Vfo.Parameters = make(map[string]float32)
+	r.state.Vfo.Functions = make(map[string]bool)
 	r.state.Channel = &sbRadio.Channel{}
 	r.settings = &rs
 	r.radioLogger = rs.RadioLogger
@@ -103,6 +107,7 @@ func HandleRadio(rs RadioSettings) {
 		case msg := <-rs.CatRequestCh:
 			r.deserializeCatRequest(msg)
 			r.sendState()
+			r.lastCmdRecvd = time.Now()
 
 		case <-shutdownCh:
 			r.appLogger.Println("Disconnecting from Radio")
@@ -115,9 +120,19 @@ func HandleRadio(rs RadioSettings) {
 			r.updateMeter()
 
 		case <-r.updateTicker.C:
+			// make sure we don't interrupt while receiving data
+			// as updating takes a few hundred milliseconds
+			if time.Since(r.lastCmdRecvd) < time.Second*3 {
+				continue
+			}
+
 			r.queryVfo()
-			if err := r.sendState(); err != nil {
-				r.radioLogger.Println(err)
+
+			if (r.rig.Caps.HasGetPowerStat && r.state.RadioOn) || !r.rig.Caps.HasGetPowerStat {
+
+				if err := r.sendState(); err != nil {
+					r.radioLogger.Println(err)
+				}
 			}
 		}
 	}
@@ -135,6 +150,11 @@ func (r *radio) queryVfo() error {
 				r.state.RadioOn = true
 			} else {
 				r.state.RadioOn = false
+				// announce that the radio has ben turned off
+				if err := r.sendState(); err != nil {
+					return err
+				}
+				return nil
 			}
 		}
 	}
@@ -267,8 +287,6 @@ func (r *radio) queryVfo() error {
 			}
 		}
 
-		r.state.Vfo.Functions = make(map[string]bool)
-
 		for _, f := range r.rig.Caps.GetFunctions {
 			fValue, err := r.rig.GetFunc(vfo, hl.FuncValue[f])
 			if err != nil {
@@ -277,7 +295,6 @@ func (r *radio) queryVfo() error {
 			r.state.Vfo.Functions[f] = fValue
 		}
 
-		r.state.Vfo.Levels = make(map[string]float32)
 		for _, level := range r.rig.Caps.GetLevels {
 			lValue, err := r.rig.GetLevel(vfo, hl.LevelValue[level.Name])
 			if err != nil {
@@ -286,7 +303,6 @@ func (r *radio) queryVfo() error {
 			r.state.Vfo.Levels[level.Name] = lValue
 		}
 
-		r.state.Vfo.Parameters = make(map[string]float32)
 		for _, param := range r.rig.Caps.GetParameters {
 			pValue, err := r.rig.GetParm(vfo, hl.ParmValue[param.Name])
 			if err != nil {
@@ -296,7 +312,7 @@ func (r *radio) queryVfo() error {
 		}
 	}
 
-	r.lastUpdate = time.Now()
+	r.lastUpdateSent = time.Now()
 
 	return nil
 }
