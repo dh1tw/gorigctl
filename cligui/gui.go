@@ -360,12 +360,10 @@ func (rg *radioGui) updateState(ev ui.Event) {
 
 func (rg *radioGui) updateGUI() {
 
+	// assume radio is powered on
 	powerOn := true
 
-	// ui.SendCustomEvt("/log/msg", "called drawState()")
-	// this event could still thrown by a retained
-	// state message; if the radio doesn't support powerstat
-	// we try to render it anyway
+	// verify if radio is powered on (if possible)
 	if rg.caps.HasPowerstat && !rg.state.RadioOn {
 		rg.clear()
 		rg.frequency.Text = "RADIO OFF"
@@ -380,8 +378,8 @@ func (rg *radioGui) updateGUI() {
 		rg.frequency.Text = utils.FormatFreq(rg.internalFreq)
 	}
 
-	rg.setVfo(rg.state.CurrentVfo)
-	rg.setMode(rg.state.Vfo.Mode)
+	rg.setVfo(powerOn, rg.state.CurrentVfo)
+	rg.setMode(powerOn, rg.state.Vfo.Mode)
 	rg.setFilter(powerOn, rg.state.Vfo.PbWidth)
 	rg.setRit(powerOn, rg.state.Vfo.Rit)
 	rg.setXit(powerOn, rg.state.Vfo.Xit)
@@ -390,9 +388,9 @@ func (rg *radioGui) updateGUI() {
 	rg.setTxMode(splitEnabled, rg.state.Vfo.Split.Mode)
 	rg.setTxFrequency(splitEnabled, rg.state.Vfo.Split.Frequency)
 	rg.setTxFilter(splitEnabled, rg.state.Vfo.Split.PbWidth)
-	rg.setPtt(rg.state.Ptt)
+	rg.setPtt(powerOn, rg.state.Ptt)
 	rg.setAntenna(powerOn, rg.state.Vfo.Ant)
-	rg.setPowerOn(rg.state.RadioOn)
+	rg.setPowerOn(rg.caps.HasPowerstat, rg.state.RadioOn)
 
 	ptt := rg.state.Ptt
 
@@ -443,13 +441,21 @@ func (rg *radioGui) clear() {
 	}
 }
 
-func (rg *radioGui) setVfo(vfo string) {
-	rg.vfo.Text = vfo
+func (rg *radioGui) setVfo(powerOn bool, vfo string) {
+	if powerOn {
+		rg.vfo.Text = vfo
+	} else {
+		rg.vfo.Text = ""
+	}
 	ui.Render(rg.vfo)
 }
 
-func (rg *radioGui) setMode(mode string) {
-	rg.mode.Text = rg.state.Vfo.Mode
+func (rg *radioGui) setMode(powerOn bool, mode string) {
+	if powerOn {
+		rg.mode.Text = mode
+	} else {
+		rg.mode.Text = ""
+	}
 	ui.Render(rg.mode)
 }
 
@@ -507,8 +513,8 @@ func (rg *radioGui) setAntenna(powerOn bool, ant int32) {
 	ui.Render(rg.antenna)
 }
 
-func (rg *radioGui) setPtt(ptt bool) {
-	if ptt {
+func (rg *radioGui) setPtt(powerOn bool, ptt bool) {
+	if powerOn && ptt {
 		rg.ptt.Bg = ui.ColorRed
 	} else {
 		rg.ptt.Bg = ui.ColorDefault
@@ -516,11 +522,17 @@ func (rg *radioGui) setPtt(ptt bool) {
 	ui.Render(rg.ptt)
 }
 
-func (rg *radioGui) setPowerOn(powerOn bool) {
+func (rg *radioGui) setPowerOn(hasPowerOn bool, powerOn bool) {
+	rg.powerOn.Text = ""
 	if powerOn {
 		rg.powerOn.Bg = ui.ColorGreen
 	} else {
-		rg.powerOn.Bg = ui.ColorDefault
+		if hasPowerOn {
+			rg.powerOn.Bg = ui.ColorDefault
+		} else {
+			rg.powerOn.Bg = ui.ColorDefault
+			rg.powerOn.Text = "n/a"
+		}
 	}
 	ui.Render(rg.powerOn)
 }

@@ -97,7 +97,7 @@ func HandleRemoteRadio(rs RemoteRadioSettings) {
 			ui.SendCustomEvt("/radio/caps", r.caps)
 
 		case msg := <-rs.CatResponseCh:
-			r.printRigUpdates = true
+			// r.printRigUpdates = true
 			err := r.deserializeCatResponse(msg)
 			if err != nil {
 				ui.SendCustomEvt("/log/msg", err.Error())
@@ -120,9 +120,9 @@ func HandleRemoteRadio(rs RemoteRadioSettings) {
 
 		case msg := <-serverStatusCh:
 			if msg.(bool) {
-				logger.Println("Server Online")
+				logger.Println("Radio Online")
 			} else {
-				logger.Println("Server Offline")
+				logger.Println("Radio Offline")
 			}
 			ui.SendCustomEvt("/radio/status", msg.(bool))
 

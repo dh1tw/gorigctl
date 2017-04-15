@@ -46,6 +46,7 @@ func HandleRadio(rs RadioSettings) {
 
 	defer rs.WaitGroup.Done()
 
+	prepareShutdownCh := rs.Events.Sub(events.PrepareShutdown)
 	shutdownCh := rs.Events.Sub(events.Shutdown)
 
 	r := radio{}
@@ -108,6 +109,13 @@ func HandleRadio(rs RadioSettings) {
 			r.deserializeCatRequest(msg)
 			r.sendState()
 			r.lastCmdRecvd = time.Now()
+
+		case <-prepareShutdownCh:
+			r.pollingTicker.Stop()
+			r.updateTicker.Stop()
+			r.sendClearState()
+			time.Sleep(time.Millisecond * 100)
+			r.sendClearCaps()
 
 		case <-shutdownCh:
 			r.appLogger.Println("Disconnecting from Radio")
@@ -409,6 +417,32 @@ func (r *radio) updateMeter() error {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (r *radio) sendClearState() error {
+
+	msg := comms.IOMsg{}
+	msg.Data = []byte{}
+	msg.Retain = true
+	msg.Topic = r.settings.CatResponseTopic
+	msg.Qos = 0
+
+	r.settings.ToWireCh <- msg
+
+	return nil
+}
+
+func (r *radio) sendClearCaps() error {
+
+	msg := comms.IOMsg{}
+	msg.Data = []byte{}
+	msg.Retain = true
+	msg.Topic = r.settings.CapsTopic
+	msg.Qos = 0
+
+	r.settings.ToWireCh <- msg
 
 	return nil
 }

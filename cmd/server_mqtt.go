@@ -201,7 +201,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	go comms.MqttClient(mqttSettings)
 	go ping.EchoPing(pongSettings)
 
-	time.Sleep(time.Millisecond * 1300)
+	time.Sleep(time.Millisecond * 500)
 	go radio.HandleRadio(radioSettings)
 
 	status := serverStatus{}
@@ -213,12 +213,13 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		select {
 		case <-prepareShutdownCh:
 
+			time.Sleep(time.Microsecond * 200)
 			// publish that the server is going offline
 			status.online = false
 			if err := status.sendUpdate(); err != nil {
 				fmt.Println(err)
 			}
-			time.Sleep(time.Millisecond * 500)
+			time.Sleep(time.Millisecond * 100)
 			// inform the other goroutines to shut down
 			evPS.Pub(true, events.Shutdown)
 
