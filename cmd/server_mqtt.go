@@ -213,6 +213,8 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		select {
 		case <-prepareShutdownCh:
 
+			// wait for 200 ms so that CAPS and STATE
+			// can send their final message
 			time.Sleep(time.Microsecond * 200)
 			// publish that the server is going offline
 			status.online = false
