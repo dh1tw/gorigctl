@@ -381,17 +381,17 @@ func (rg *radioGui) updateGUI() {
 	rg.setVfo(powerOn, rg.state.CurrentVfo)
 	rg.setMode(powerOn, rg.state.Vfo.Mode)
 	rg.setFilter(powerOn, rg.state.Vfo.PbWidth)
-	rg.setRit(powerOn, rg.state.Vfo.Rit)
-	rg.setXit(powerOn, rg.state.Vfo.Xit)
+	rg.setRit(rg.caps.HasRit, powerOn, rg.state.Vfo.Rit)
+	rg.setXit(rg.caps.HasXit, powerOn, rg.state.Vfo.Xit)
 	splitEnabled := rg.state.Vfo.Split.Enabled
 	rg.setSplitVfo(splitEnabled, rg.state.Vfo.Split.Vfo)
 	rg.setTxMode(splitEnabled, rg.state.Vfo.Split.Mode)
 	rg.setTxFrequency(splitEnabled, rg.state.Vfo.Split.Frequency)
 	rg.setTxFilter(splitEnabled, rg.state.Vfo.Split.PbWidth)
 	rg.setPtt(powerOn, rg.state.Ptt)
-	rg.setAntenna(powerOn, rg.state.Vfo.Ant)
+	rg.setAntenna(rg.caps.HasAnt, powerOn, rg.state.Vfo.Ant)
 	rg.setPowerOn(rg.caps.HasPowerstat, rg.state.RadioOn)
-	rg.setTuningStep(powerOn, rg.state.Vfo.TuningStep)
+	rg.setTuningStep(rg.caps.HasTs, powerOn, rg.state.Vfo.TuningStep)
 
 	ptt := rg.state.Ptt
 
@@ -408,15 +408,15 @@ func (rg *radioGui) updateGUI() {
 	}
 
 	if attValue, ok := rg.state.Vfo.Levels["ATT"]; ok {
-		rg.setAttenuator(powerOn, attValue)
+		rg.setAttenuator(true, powerOn, attValue)
 	} else {
-		rg.setAttenuator(false, 0)
+		rg.setAttenuator(false, powerOn, 0)
 	}
 
 	if preampValue, ok := rg.state.Vfo.Levels["PREAMP"]; ok {
-		rg.setPreamp(powerOn, preampValue)
+		rg.setPreamp(true, powerOn, preampValue)
 	} else {
-		rg.setPreamp(false, 0)
+		rg.setPreamp(false, powerOn, 0)
 	}
 
 	// fmt.Println(rg.state.Vfo.Functions)
@@ -469,7 +469,7 @@ func (rg *radioGui) setFilter(powerOn bool, filter int32) {
 	ui.Render(rg.filter)
 }
 
-func (rg *radioGui) setRit(powerOn bool, rit int32) {
+func (rg *radioGui) setRit(hasRit, powerOn bool, rit int32) {
 	if powerOn {
 		rg.rit.Text = fmt.Sprintf("%v Hz", rit)
 		if rg.state.Vfo.Rit != 0 {
@@ -484,10 +484,15 @@ func (rg *radioGui) setRit(powerOn bool, rit int32) {
 		rg.rit.TextBgColor = ui.ColorDefault
 		rg.rit.Bg = ui.ColorDefault
 	}
+	if !hasRit {
+		rg.rit.Text = "n/a"
+		rg.rit.TextBgColor = ui.ColorDefault
+		rg.rit.Bg = ui.ColorDefault
+	}
 	ui.Render(rg.rit)
 }
 
-func (rg *radioGui) setXit(powerOn bool, xit int32) {
+func (rg *radioGui) setXit(hasXit, powerOn bool, xit int32) {
 	if powerOn {
 		rg.xit.Text = fmt.Sprintf("%v Hz", xit)
 		if rg.state.Vfo.Xit != 0 {
@@ -502,24 +507,38 @@ func (rg *radioGui) setXit(powerOn bool, xit int32) {
 		rg.xit.TextBgColor = ui.ColorDefault
 		rg.xit.Bg = ui.ColorDefault
 	}
+	if !hasXit {
+		rg.xit.Text = "n/a"
+		rg.xit.TextBgColor = ui.ColorDefault
+		rg.xit.Bg = ui.ColorDefault
+	}
 	ui.Render(rg.xit)
 }
 
-func (rg *radioGui) setAntenna(powerOn bool, ant int32) {
+func (rg *radioGui) setAntenna(hasAnt, powerOn bool, ant int32) {
 	if powerOn {
-		rg.antenna.Text = fmt.Sprintf("%v", ant)
+		if !hasAnt {
+			rg.antenna.Text = "n/a"
+		} else {
+			rg.antenna.Text = fmt.Sprintf("%v", ant)
+		}
 	} else {
-		rg.antenna.Text = fmt.Sprintf("")
+		rg.antenna.Text = ""
 	}
 	ui.Render(rg.antenna)
 }
 
-func (rg *radioGui) setTuningStep(powerOn bool, ts int32) {
+func (rg *radioGui) setTuningStep(hasTs, powerOn bool, ts int32) {
 	if powerOn {
-		rg.tuningStep.Text = fmt.Sprintf("%d Hz", ts)
+		if !hasTs {
+			rg.tuningStep.Text = fmt.Sprintf("n/a")
+		} else {
+			rg.tuningStep.Text = fmt.Sprintf("%d Hz", ts)
+		}
 	} else {
 		rg.tuningStep.Text = fmt.Sprintf("")
 	}
+
 	ui.Render(rg.tuningStep)
 }
 
@@ -648,41 +667,55 @@ func (rg *radioGui) setSMeter(ptt bool, value float32) {
 	ui.Render(rg.sMeter)
 }
 
-func (rg *radioGui) setAttenuator(powerOn bool, value float32) {
+func (rg *radioGui) setAttenuator(hasAtt, powerOn bool, value float32) {
 	if powerOn {
-		if value > 0 {
-			rg.attenuator.Text = fmt.Sprintf("-%.0f dB", value)
-			rg.attenuator.Bg = ui.ColorGreen
-			rg.attenuator.TextBgColor = ui.ColorGreen
-		} else {
-			rg.attenuator.Text = fmt.Sprintf("%.0f dB", value)
+		if !hasAtt {
+			rg.attenuator.Text = "n/a"
 			rg.attenuator.Bg = ui.ColorDefault
 			rg.attenuator.TextBgColor = ui.ColorDefault
+		} else {
+			if value > 0 {
+				rg.attenuator.Text = fmt.Sprintf("-%.0f dB", value)
+				rg.attenuator.Bg = ui.ColorGreen
+				rg.attenuator.TextBgColor = ui.ColorGreen
+			} else {
+				rg.attenuator.Text = fmt.Sprintf("%.0f dB", value)
+				rg.attenuator.Bg = ui.ColorDefault
+				rg.attenuator.TextBgColor = ui.ColorDefault
+			}
 		}
 	} else {
 		rg.attenuator.Text = ""
 		rg.attenuator.Bg = ui.ColorDefault
 		rg.attenuator.TextBgColor = ui.ColorDefault
 	}
+
 	ui.Render(rg.attenuator)
 }
 
-func (rg *radioGui) setPreamp(powerOn bool, value float32) {
+func (rg *radioGui) setPreamp(hasPreamp, powerOn bool, value float32) {
 	if powerOn {
-		if value > 0 {
-			rg.preamp.Text = fmt.Sprintf("-%.0f dB", value)
-			rg.preamp.Bg = ui.ColorGreen
-			rg.preamp.TextBgColor = ui.ColorGreen
-		} else {
-			rg.preamp.Text = fmt.Sprintf("%.0f dB", value)
+		if !hasPreamp {
+			rg.preamp.Text = "n/a"
 			rg.preamp.Bg = ui.ColorDefault
 			rg.preamp.TextBgColor = ui.ColorDefault
+		} else {
+			if value > 0 {
+				rg.preamp.Text = fmt.Sprintf("-%.0f dB", value)
+				rg.preamp.Bg = ui.ColorGreen
+				rg.preamp.TextBgColor = ui.ColorGreen
+			} else {
+				rg.preamp.Text = fmt.Sprintf("%.0f dB", value)
+				rg.preamp.Bg = ui.ColorDefault
+				rg.preamp.TextBgColor = ui.ColorDefault
+			}
 		}
 	} else {
 		rg.preamp.Text = ""
 		rg.preamp.Bg = ui.ColorDefault
 		rg.preamp.TextBgColor = ui.ColorDefault
 	}
+
 	ui.Render(rg.preamp)
 }
 

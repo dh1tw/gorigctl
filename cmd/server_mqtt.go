@@ -39,7 +39,9 @@ func init() {
 	serverMqttCmd.Flags().IntP("broker-port", "p", 1883, "Broker Port")
 	serverMqttCmd.Flags().StringP("station", "X", "mystation", "Your station callsign")
 	serverMqttCmd.Flags().StringP("radio", "Y", "myradio", "Radio ID")
-	serverMqttCmd.Flags().DurationP("polling_interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig")
+	serverMqttCmd.Flags().DurationP("polling_interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig's meter values [ms] (0 = disabled)")
+	serverMqttCmd.Flags().DurationP("sync_interval", "k", time.Duration(time.Second*3), "Timer for syncing all values with the rig [s] (0 = disabled)")
+
 }
 
 func mqttRadioServer(cmd *cobra.Command, args []string) {
@@ -55,6 +57,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("mqtt.station", cmd.Flags().Lookup("station"))
 	viper.BindPFlag("mqtt.radio", cmd.Flags().Lookup("radio"))
 	viper.BindPFlag("radio.polling_interval", cmd.Flags().Lookup("polling_interval"))
+	viper.BindPFlag("radio.sync_interval", cmd.Flags().Lookup("sync_interval"))
 
 	if viper.IsSet("general.user_id") {
 		viper.Set("general.user_id", utils.RandStringRunes(5))
@@ -172,6 +175,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	}
 
 	pollingInterval := viper.GetDuration("radio.polling_interval")
+	syncInterval := viper.GetDuration("radio.sync_interval")
 
 	radioSettings := radio.RadioSettings{
 		RigModel:         rigModel,
@@ -184,6 +188,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		WaitGroup:        &wg,
 		Events:           evPS,
 		PollingInterval:  pollingInterval,
+		SyncInterval:     syncInterval,
 		RadioLogger:      radioLogger,
 		AppLogger:        appLogger,
 	}

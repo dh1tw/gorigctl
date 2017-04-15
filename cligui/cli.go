@@ -192,11 +192,22 @@ func (r *remoteRadio) populateCliCmds() {
 		Name:        "set_polling_interval",
 		Shortcut:    "",
 		Parameters:  "Polling rate [ms]",
-		Description: "Set the radios polling Rate for updating the meters (SWR, ALC, Field Strength...)",
-		Example:     "set_polling_rate 50",
+		Description: "Set the polling interval for updating the meter values (SWR, ALC, Field Strength...)",
+		Example:     "set_polling_interval 50",
 	}
 
 	r.cliCmds = append(r.cliCmds, cliSetPollingInterval)
+
+	cliSetSyncInterval := cliCmd{
+		Cmd:         setSyncInterval,
+		Name:        "set_sync_interval",
+		Shortcut:    "",
+		Parameters:  "Sync rate [s]",
+		Description: "Set the interval for synchronizing all radio values",
+		Example:     "set_sync_interval 5",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliSetSyncInterval)
 
 	cliSetPrintUpdates := cliCmd{
 		Cmd:         setPrintRigUpdates,
@@ -721,6 +732,27 @@ func setPollingInterval(r *remoteRadio, args []string) {
 
 	req.PollingInterval = int32(ur)
 	req.Md.HasPollingInterval = true
+
+	if err := r.sendCatRequest(req); err != nil {
+		r.logger.Println("ERROR:", err)
+	}
+}
+
+func setSyncInterval(r *remoteRadio, args []string) {
+	if !r.checkArgs(args, 1) {
+		return
+	}
+
+	req := r.initSetState()
+
+	ur, err := strconv.ParseInt(args[0], 10, 32)
+	if err != nil {
+		r.logger.Println("ERROR: polling interval must be integer [s]")
+		return
+	}
+
+	req.SyncInterval = int32(ur)
+	req.Md.HasSyncInterval = true
 
 	if err := r.sendCatRequest(req); err != nil {
 		r.logger.Println("ERROR:", err)

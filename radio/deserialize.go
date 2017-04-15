@@ -164,15 +164,31 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasPollingInterval {
 		if ns.GetPollingInterval() != r.state.PollingInterval {
 			if ns.GetPollingInterval() > 0 {
-				r.appLogger.Println("updating rig polling interval to %d ms\n", ns.PollingInterval)
+				r.radioLogger.Printf("updating rig polling interval to %d ms\n", ns.PollingInterval)
 				newPollingInterval := time.Millisecond * time.Duration(ns.GetPollingInterval())
 				r.pollingTicker.Stop()
 				r.pollingTicker = time.NewTicker(newPollingInterval)
 				r.state.PollingInterval = ns.GetPollingInterval()
 			} else {
-				r.appLogger.Println("stopping rig polling")
+				r.radioLogger.Println("stopped rig polling")
 				r.pollingTicker.Stop()
 				r.state.PollingInterval = 0
+			}
+		}
+	}
+
+	if ns.Md.HasSyncInterval {
+		if ns.GetSyncInterval() != r.state.SyncInterval {
+			if ns.GetSyncInterval() > 0 {
+				r.radioLogger.Printf("updating rig sync interval to %d ms\n", ns.SyncInterval)
+				newSyncInterval := time.Millisecond * time.Duration(ns.GetSyncInterval())
+				r.syncTicker.Stop()
+				r.syncTicker = time.NewTicker(newSyncInterval)
+				r.state.SyncInterval = ns.GetSyncInterval()
+			} else {
+				r.radioLogger.Println("stopped rig sync")
+				r.syncTicker.Stop()
+				r.state.SyncInterval = 0
 			}
 		}
 	}

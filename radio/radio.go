@@ -26,6 +26,7 @@ type RadioSettings struct {
 	WaitGroup        *sync.WaitGroup
 	Events           *pubsub.PubSub
 	PollingInterval  time.Duration
+	SyncInterval     time.Duration
 	RadioLogger      *log.Logger
 	AppLogger        *log.Logger
 }
@@ -39,7 +40,7 @@ type radio struct {
 	appLogger      *log.Logger
 	lastUpdateSent time.Time
 	lastCmdRecvd   time.Time
-	updateTicker   *time.Ticker
+	syncTicker     *time.Ticker
 }
 
 func HandleRadio(rs RadioSettings) {
@@ -62,6 +63,7 @@ func HandleRadio(rs RadioSettings) {
 	r.appLogger = rs.AppLogger
 
 	r.state.PollingInterval = int32(r.settings.PollingInterval.Nanoseconds() / 1000000)
+	r.state.SyncInterval = int32(r.settings.SyncInterval.Seconds())
 
 	err := r.rig.Init(rs.RigModel)
 	if err != nil {
@@ -100,8 +102,18 @@ func HandleRadio(rs RadioSettings) {
 		r.radioLogger.Println(err)
 	}
 
-	r.pollingTicker = time.NewTicker(r.settings.PollingInterval)
-	r.updateTicker = time.NewTicker(time.Second)
+	if r.settings.PollingInterval > 0 {
+		r.pollingTicker = time.NewTicker(r.settings.PollingInterval)
+	} else {
+		r.pollingTicker = time.NewTicker(time.Second * 100)
+		r.pollingTicker.Stop()
+	}
+	if r.settings.SyncInterval > 0 {
+		r.syncTicker = time.NewTicker(r.settings.SyncInterval)
+	} else {
+		r.syncTicker = time.NewTicker(time.Second * 100)
+		r.syncTicker.Stop()
+	}
 
 	for {
 		select {
@@ -112,7 +124,7 @@ func HandleRadio(rs RadioSettings) {
 
 		case <-prepareShutdownCh:
 			r.pollingTicker.Stop()
-			r.updateTicker.Stop()
+			r.syncTicker.Stop()
 			r.sendClearState()
 			time.Sleep(time.Millisecond * 100)
 			r.sendClearCaps()
@@ -127,7 +139,7 @@ func HandleRadio(rs RadioSettings) {
 		case <-r.pollingTicker.C:
 			r.updateMeter()
 
-		case <-r.updateTicker.C:
+		case <-r.syncTicker.C:
 			// make sure we don't interrupt while receiving data
 			// as updating takes a few hundred milliseconds
 			if time.Since(r.lastCmdRecvd) < time.Second*3 {

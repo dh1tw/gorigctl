@@ -9,6 +9,7 @@ message State{  // Rig State
     bool radio_on = 4;
     bool ptt = 5;
     int32 polling_interval = 6; // ms
+    int32 sync_interval = 7; // sec
 }
 
 message SetState{
@@ -20,7 +21,8 @@ message SetState{
     bool ptt = 6;
     MetaData md = 7;
     int32 polling_interval = 8;
-    string user_id = 9;
+    int32 sync_interval = 9;
+    string user_id = 10;
 }
 
 message Capabilities{
@@ -87,6 +89,7 @@ message MetaData{
     bool has_ptt = 12;
     bool has_radio_on = 13;
     bool has_polling_interval = 14;
+    bool has_sync_interval = 15;
 }
 
 message Channel{
