@@ -36,7 +36,7 @@ type radioGui struct {
 	vfo                  *ui.Par
 	mode                 *ui.Par
 	filter               *ui.Par
-	ifShift              *ui.Par
+	tuningStep           *ui.Par
 	rit                  *ui.Par
 	xit                  *ui.Par
 	split                *ui.Par
@@ -156,9 +156,9 @@ func (rg *radioGui) init() {
 	rg.preamp.Height = 3
 	rg.preamp.BorderLabel = "Preamp"
 
-	rg.ifShift = ui.NewPar("")
-	rg.ifShift.Height = 3
-	rg.ifShift.BorderLabel = "IF Shift"
+	rg.tuningStep = ui.NewPar("")
+	rg.tuningStep.Height = 3
+	rg.tuningStep.BorderLabel = "Tuning Step"
 
 	rg.rit = ui.NewPar("")
 	rg.rit.Height = 3
@@ -223,7 +223,7 @@ func (rg *radioGui) init() {
 			ui.NewCol(1, 0, rg.antenna),
 			ui.NewCol(1, 0, rg.attenuator),
 			ui.NewCol(1, 0, rg.preamp),
-			ui.NewCol(1, 0, rg.ifShift)),
+			ui.NewCol(1, 0, rg.tuningStep)),
 		ui.NewRow(
 			ui.NewCol(2, 0, rg.ptt),
 			ui.NewCol(1, 0, rg.split),
@@ -391,6 +391,7 @@ func (rg *radioGui) updateGUI() {
 	rg.setPtt(powerOn, rg.state.Ptt)
 	rg.setAntenna(powerOn, rg.state.Vfo.Ant)
 	rg.setPowerOn(rg.caps.HasPowerstat, rg.state.RadioOn)
+	rg.setTuningStep(powerOn, rg.state.Vfo.TuningStep)
 
 	ptt := rg.state.Ptt
 
@@ -511,6 +512,15 @@ func (rg *radioGui) setAntenna(powerOn bool, ant int32) {
 		rg.antenna.Text = fmt.Sprintf("")
 	}
 	ui.Render(rg.antenna)
+}
+
+func (rg *radioGui) setTuningStep(powerOn bool, ts int32) {
+	if powerOn {
+		rg.tuningStep.Text = fmt.Sprintf("%d Hz", ts)
+	} else {
+		rg.tuningStep.Text = fmt.Sprintf("")
+	}
+	ui.Render(rg.tuningStep)
 }
 
 func (rg *radioGui) setPtt(powerOn bool, ptt bool) {
