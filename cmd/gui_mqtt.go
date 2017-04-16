@@ -25,7 +25,7 @@ import (
 var guiMqttCmd = &cobra.Command{
 	Use:   "mqtt",
 	Short: "GUI client which connects via MQTT to a remote Radio",
-	Long:  `GUI client which connects via MQTT to a remote Radio
+	Long: `GUI client which connects via MQTT to a remote Radio
 	
 The MQTT Topics follow the Shackbus convention and must match on the
 Server and the Client.
@@ -34,7 +34,7 @@ The parameters in "<>" can be set through flags or in the config file:
 <station>/radios/<radio>/cat
 
 `,
-	Run:   guiCliClient,
+	Run: guiCliClient,
 }
 
 func init() {
@@ -63,17 +63,16 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("mqtt.station", cmd.Flags().Lookup("station"))
 	viper.BindPFlag("mqtt.radio", cmd.Flags().Lookup("radio"))
 
-	if viper.IsSet("general.user_id") {
-		viper.Set("general.user_id", utils.RandStringRunes(5))
-	} else {
-		viper.Set("general.user_id", "unknown_"+utils.RandStringRunes(5))
-	}
+	userID := "unknown_" + utils.RandStringRunes(5)
+	mqttClientID := "unknown_" + utils.RandStringRunes(5)
 
-	userID := viper.GetString("general.user_id")
+	if viper.IsSet("general.user_id") {
+		userID = viper.GetString("general.user_id")
+		mqttClientID = viper.GetString("general.user_id") + utils.RandStringRunes(5)
+	}
 
 	mqttBrokerURL := viper.GetString("mqtt.broker_url")
 	mqttBrokerPort := viper.GetInt("mqtt.broker_port")
-	mqttClientID := viper.GetString("general.user_id")
 
 	baseTopic := viper.GetString("mqtt.station") +
 		"/radios/" + viper.GetString("mqtt.radio") +
@@ -149,6 +148,7 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 		CatRequestTopic: serverCatRequestTopic,
 		Events:          evPS,
 		WaitGroup:       &wg,
+		UserID:          userID,
 	}
 
 	serverStatusSettings := serverstatus.Settings{

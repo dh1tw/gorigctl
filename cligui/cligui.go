@@ -13,7 +13,6 @@ import (
 	sbStatus "github.com/dh1tw/gorigctl/sb_status"
 	"github.com/dh1tw/gorigctl/utils"
 	ui "github.com/gizak/termui"
-	"github.com/spf13/viper"
 )
 
 type RemoteRadioSettings struct {
@@ -26,6 +25,7 @@ type RemoteRadioSettings struct {
 	CapabilitiesCh  chan []byte
 	WaitGroup       *sync.WaitGroup
 	Events          *pubsub.PubSub
+	UserID          string
 }
 
 type remoteRadio struct {
@@ -66,11 +66,7 @@ func HandleRemoteRadio(rs RemoteRadioSettings) {
 	r.cliCmds = make([]cliCmd, 0, 30)
 	r.populateCliCmds()
 
-	if viper.IsSet("general.user_id") {
-		r.userID = viper.GetString("general.user_id")
-	} else {
-		r.userID = "unknown_" + utils.RandStringRunes(5)
-	}
+	r.userID = rs.UserID
 
 	logger := utils.NewChLogger(rs.Events, events.AppLog, "")
 	r.logger = logger

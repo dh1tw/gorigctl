@@ -52,15 +52,16 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("mqtt.station", cmd.Flags().Lookup("station"))
 	viper.BindPFlag("mqtt.radio", cmd.Flags().Lookup("radio"))
 
+	// userID := "unknown_" + utils.RandStringRunes(5)
+	mqttClientID := "unknown_" + utils.RandStringRunes(5)
+
 	if viper.IsSet("general.user_id") {
-		viper.Set("general.user_id", utils.RandStringRunes(5))
-	} else {
-		viper.Set("general.user_id", "unknown_"+utils.RandStringRunes(5))
+		// userID = viper.GetString("general.user_id")
+		mqttClientID = viper.GetString("general.user_id") + utils.RandStringRunes(5)
 	}
 
 	mqttBrokerURL := viper.GetString("mqtt.broker_url")
 	mqttBrokerPort := viper.GetInt("mqtt.broker_port")
-	mqttClientID := viper.GetString("general.user_id")
 
 	baseTopic := viper.GetString("mqtt.station") +
 		"/radios/" + viper.GetString("mqtt.radio") +
