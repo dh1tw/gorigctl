@@ -1,6 +1,7 @@
 package cligui
 
 import (
+	"html/template"
 	"math"
 	"strconv"
 	"strings"
@@ -22,6 +23,15 @@ func (r *remoteRadio) populateCliCmds() {
 
 	r.cliCmds = append(r.cliCmds, cliSetFrequency)
 
+	cliGetFrequency := cliCmd{
+		Cmd:         getFrequency,
+		Name:        "get_freq",
+		Shortcut:    "f",
+		Description: "Frequency [kHz] of current VFO",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetFrequency)
+
 	cliSetMode := cliCmd{
 		Cmd:         setMode,
 		Name:        "set_mode",
@@ -32,6 +42,15 @@ func (r *remoteRadio) populateCliCmds() {
 	}
 
 	r.cliCmds = append(r.cliCmds, cliSetMode)
+
+	cliGetMode := cliCmd{
+		Cmd:         getMode,
+		Name:        "get_mode",
+		Shortcut:    "m",
+		Description: "Get Mode",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetMode)
 
 	cliSetVfo := cliCmd{
 		Cmd:         setVfo,
@@ -44,6 +63,15 @@ func (r *remoteRadio) populateCliCmds() {
 
 	r.cliCmds = append(r.cliCmds, cliSetVfo)
 
+	cliGetVfo := cliCmd{
+		Cmd:         getVfo,
+		Name:        "get_vfo",
+		Shortcut:    "v",
+		Description: "Get Vfo",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetVfo)
+
 	cliSetRit := cliCmd{
 		Cmd:         setRit,
 		Name:        "set_rit",
@@ -54,6 +82,15 @@ func (r *remoteRadio) populateCliCmds() {
 	}
 
 	r.cliCmds = append(r.cliCmds, cliSetRit)
+
+	cliGetRit := cliCmd{
+		Cmd:         getRit,
+		Name:        "get_rit",
+		Shortcut:    "j",
+		Description: "Get Rit [Hz]",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetRit)
 
 	cliSetXit := cliCmd{
 		Cmd:         setXit,
@@ -66,6 +103,15 @@ func (r *remoteRadio) populateCliCmds() {
 
 	r.cliCmds = append(r.cliCmds, cliSetXit)
 
+	cliGetXit := cliCmd{
+		Cmd:         getXit,
+		Name:        "get_xit",
+		Shortcut:    "z",
+		Description: "Get Xit [Hz]",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetXit)
+
 	cliSetAnt := cliCmd{
 		Cmd:         setAnt,
 		Name:        "set_ant",
@@ -77,6 +123,15 @@ func (r *remoteRadio) populateCliCmds() {
 
 	r.cliCmds = append(r.cliCmds, cliSetAnt)
 
+	cliGetAnt := cliCmd{
+		Cmd:         getAnt,
+		Name:        "get_ant",
+		Shortcut:    "y",
+		Description: "Get Antenna",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetAnt)
+
 	cliSetPtt := cliCmd{
 		Cmd:         setPtt,
 		Name:        "set_ptt",
@@ -87,6 +142,15 @@ func (r *remoteRadio) populateCliCmds() {
 	}
 
 	r.cliCmds = append(r.cliCmds, cliSetPtt)
+
+	cliGetPtt := cliCmd{
+		Cmd:         getPtt,
+		Name:        "get_ptt",
+		Shortcut:    "y",
+		Description: "Get Ptt",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetPtt)
 
 	cliExecVfoOp := cliCmd{
 		Cmd:         execVfoOp,
@@ -104,11 +168,20 @@ func (r *remoteRadio) populateCliCmds() {
 		Name:        "set_func",
 		Shortcut:    "U",
 		Parameters:  "Function",
-		Description: "Set a Rig function",
-		Example:     "U NB true",
+		Description: "Toggles a Rig function",
+		Example:     "U NB",
 	}
 
 	r.cliCmds = append(r.cliCmds, cliSetFunction)
+
+	cliGetFunction := cliCmd{
+		Cmd:         getFunctionsPlain,
+		Name:        "get_func",
+		Shortcut:    "u",
+		Description: "List the activated functions",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetFunction)
 
 	cliSetLevel := cliCmd{
 		Cmd:         setLevel,
@@ -121,6 +194,15 @@ func (r *remoteRadio) populateCliCmds() {
 
 	r.cliCmds = append(r.cliCmds, cliSetLevel)
 
+	cliGetLevelsPlain := cliCmd{
+		Cmd:         getLevelsPlain,
+		Name:        "get_level",
+		Shortcut:    "l",
+		Description: "Lists all available levels",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetLevelsPlain)
+
 	cliSetTuningStep := cliCmd{
 		Cmd:         setTuningStep,
 		Name:        "set_ts",
@@ -131,6 +213,15 @@ func (r *remoteRadio) populateCliCmds() {
 	}
 
 	r.cliCmds = append(r.cliCmds, cliSetTuningStep)
+
+	cliGetTuningStep := cliCmd{
+		Cmd:         getTuningStep,
+		Name:        "get_ts",
+		Shortcut:    "n",
+		Description: "Get the current tuning step [Hz]",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetTuningStep)
 
 	cliSetPowerStat := cliCmd{
 		Cmd:         setPowerStat,
@@ -143,16 +234,34 @@ func (r *remoteRadio) populateCliCmds() {
 
 	r.cliCmds = append(r.cliCmds, cliSetPowerStat)
 
+	cliGetPowerStat := cliCmd{
+		Cmd:         getPowerStat,
+		Name:        "get_powerstat",
+		Shortcut:    "",
+		Description: "Get the power status of the radio (On/Off)",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetPowerStat)
+
 	cliSetSplit := cliCmd{
 		Cmd:         setSplitVfo,
-		Name:        "set_split_vfo",
+		Name:        "set_split",
 		Shortcut:    "S",
-		Parameters:  "Split [true, t, 1, false, f, 0], VFO",
-		Description: "Turn Split On/Off",
-		Example:     "S 1",
+		Parameters:  "Split VFO [true, t, 1, false, f, 0]",
+		Description: "Turn Split On/Off for a VFO",
+		Example:     "S 1 VFOB",
 	}
 
 	r.cliCmds = append(r.cliCmds, cliSetSplit)
+
+	cliGetSplit := cliCmd{
+		Cmd:         getSplit,
+		Name:        "get_split",
+		Shortcut:    "s",
+		Description: "Get the split status (if enabled: VFO, Frequency, Mode, Filter)",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetSplit)
 
 	cliSetSplitFrequency := cliCmd{
 		Cmd:         setSplitFreq,
@@ -198,6 +307,24 @@ func (r *remoteRadio) populateCliCmds() {
 
 	r.cliCmds = append(r.cliCmds, cliSetPollingInterval)
 
+	cliGetPollingInterval := cliCmd{
+		Cmd:         getPollingInterval,
+		Name:        "get_polling_interval",
+		Shortcut:    "",
+		Description: "Get the polling interval for updating the meter values (SWR, ALC, Field Strength...)",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetPollingInterval)
+
+	cliGetSyncInterval := cliCmd{
+		Cmd:         getSyncInterval,
+		Name:        "get_sync_interval",
+		Shortcut:    "",
+		Description: "Get the interval for synchronizing all radio values",
+	}
+
+	r.cliCmds = append(r.cliCmds, cliGetSyncInterval)
+
 	cliSetSyncInterval := cliCmd{
 		Cmd:         setSyncInterval,
 		Name:        "set_sync_interval",
@@ -223,15 +350,20 @@ func (r *remoteRadio) populateCliCmds() {
 
 func (r *remoteRadio) parseCli(cliCmd []string) {
 
+	found := false
 	for _, cmd := range r.cliCmds {
 		if cmd.Name == cliCmd[0] || cmd.Shortcut == cliCmd[0] {
 			cmd.Cmd(r, cliCmd[1:])
-		}
+			found = true
+		} 
+	}
+	if !found{
+		r.logger.Println("unknown command")
 	}
 }
 
 func getFrequency(r *remoteRadio, args []string) {
-	r.logger.Printf("Frequency: %.3fkHz\n", r.state.Vfo.Frequency/1000)
+	r.logger.Printf("Frequency: %.3f kHz\n", r.state.Vfo.Frequency/1000)
 }
 
 func setFrequency(r *remoteRadio, args []string) {
@@ -328,7 +460,7 @@ func setVfo(r *remoteRadio, args []string) {
 }
 
 func getRit(r *remoteRadio, args []string) {
-	r.logger.Printf("Rit: %dHz\n", r.state.Vfo.Rit)
+	r.logger.Printf("Rit: %d Hz\n", r.state.Vfo.Rit)
 }
 
 func setRit(r *remoteRadio, args []string) {
@@ -357,7 +489,7 @@ func setRit(r *remoteRadio, args []string) {
 }
 
 func getXit(r *remoteRadio, args []string) {
-	r.logger.Printf("Xit: %dHz\n", r.state.Vfo.Xit)
+	r.logger.Printf("Xit: %d Hz\n", r.state.Vfo.Xit)
 }
 
 func setXit(r *remoteRadio, args []string) {
@@ -459,6 +591,10 @@ func setPtt(r *remoteRadio, args []string) {
 	}
 }
 
+func getLevelsPlain(r *remoteRadio, args []string) {
+	r.printLevelsPlain()
+}
+
 func setLevel(r *remoteRadio, args []string) {
 	if !r.checkArgs(args, 2) {
 		return
@@ -489,8 +625,8 @@ func setLevel(r *remoteRadio, args []string) {
 	}
 }
 
-func getFunction(r *remoteRadio, args []string) {
-	r.logger.Println("Functions:", r.state.Vfo.Functions)
+func getFunctionsPlain(r *remoteRadio, args []string) {
+	r.printFunctionsPlain()
 }
 
 func setFunction(r *remoteRadio, args []string) {
@@ -523,9 +659,9 @@ func getSplit(r *remoteRadio, args []string) {
 	r.logger.Println("Split Enabled:", r.state.Vfo.Split.Enabled)
 	if r.state.Vfo.Split.Enabled {
 		r.logger.Println("Split Vfo:", r.state.Vfo.Split.Vfo)
-		r.logger.Printf("Split Freq: %.3fkHz\n", r.state.Vfo.Split.Frequency)
+		r.logger.Printf("Split Freq: %.3f kHz\n", r.state.Vfo.Split.Frequency)
 		r.logger.Println("Split Mode:", r.state.Vfo.Split.Mode)
-		r.logger.Printf("Split PbWidth: %dHz\n", r.state.Vfo.Split.PbWidth)
+		r.logger.Printf("Split PbWidth: %d Hz\n", r.state.Vfo.Split.PbWidth)
 	}
 }
 
@@ -681,7 +817,7 @@ func execVfoOp(r *remoteRadio, args []string) {
 }
 
 func getTuningStep(r *remoteRadio, args []string) {
-	r.logger.Printf("Tuning Step: %dHz\n", r.state.Vfo.TuningStep)
+	r.logger.Printf("Tuning Step: %d Hz\n", r.state.Vfo.TuningStep)
 }
 
 func setTuningStep(r *remoteRadio, args []string) {
@@ -738,6 +874,10 @@ func setPollingInterval(r *remoteRadio, args []string) {
 	}
 }
 
+func getSyncInterval(r *remoteRadio, args []string) {
+	r.logger.Printf("Rig sync interval: %ds\n", r.state.SyncInterval)
+}
+
 func setSyncInterval(r *remoteRadio, args []string) {
 	if !r.checkArgs(args, 1) {
 		return
@@ -788,4 +928,27 @@ func valueInValueList(vName string, vList []*sbRadio.Value) bool {
 		}
 	}
 	return false
+}
+
+var levelsTmpl = template.Must(template.New("").Parse(
+	`
+Levels: {{range $name, $val := .}}
+    {{$name}}: {{$val}} {{end}}
+`,
+))
+
+func (r *remoteRadio) printLevelsPlain() {
+
+	r.logger.Println("Levels:")
+	for levelName, levelValue := range r.state.Vfo.Levels {
+		r.logger.Printf(" %s: %.3f", levelName, levelValue)
+	}
+}
+
+func (r *remoteRadio) printFunctionsPlain() {
+
+	r.logger.Println("Functions:")
+	for funcName, funcValue := range r.state.Vfo.Functions {
+		r.logger.Printf(" %s: %v", funcName, funcValue)
+	}
 }
