@@ -29,8 +29,16 @@ import (
 var serverMqttCmd = &cobra.Command{
 	Use:   "mqtt",
 	Short: "MQTT server which makes a local radio available on the network",
-	Long:  `MQTT server which makes a local radio available on the network`,
-	Run:   mqttRadioServer,
+	Long: `MQTT server which makes a local radio available on the network
+		
+The MQTT Topics follow the Shackbus convention and must match on the
+Server and the Client.
+
+The parameters in "<>" can be set through flags or in the config file:
+<station>/radios/<radio>/cat
+
+	`,
+	Run: mqttRadioServer,
 }
 
 func init() {

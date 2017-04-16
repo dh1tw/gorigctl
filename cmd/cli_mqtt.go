@@ -19,8 +19,16 @@ import (
 var clientMqttCmd = &cobra.Command{
 	Use:   "mqtt",
 	Short: "command line client which connects via MQTT to a remote radio",
-	Long:  `command line client which connects via MQTT to a remote radio`,
-	Run:   mqttCliClient,
+	Long: `command line client which connects via MQTT to a remote radio
+	
+The MQTT Topics follow the Shackbus convention and must match on the
+Server and the Client.
+
+The parameters in "<>" can be set through flags or in the config file:
+<station>/radios/<radio>/cat
+
+`,
+	Run: mqttCliClient,
 }
 
 func init() {

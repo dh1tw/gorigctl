@@ -25,7 +25,15 @@ import (
 var guiMqttCmd = &cobra.Command{
 	Use:   "mqtt",
 	Short: "GUI client which connects via MQTT to a remote Radio",
-	Long:  `GUI client which connects via MQTT to a remote Radio`,
+	Long:  `GUI client which connects via MQTT to a remote Radio
+	
+The MQTT Topics follow the Shackbus convention and must match on the
+Server and the Client.
+
+The parameters in "<>" can be set through flags or in the config file:
+<station>/radios/<radio>/cat
+
+`,
 	Run:   guiCliClient,
 }
 
