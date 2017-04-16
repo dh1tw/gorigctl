@@ -545,7 +545,7 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 	r.state.Vfo.Split.Mode = hl.ModeName[txMode]
 	r.state.Vfo.Split.PbWidth = int32(txPbWidth)
 
-	return nil
+	// return nil
 	// }
 
 	// we only reach this code if the mode is the same, but we want
@@ -573,6 +573,23 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 		}
 		r.state.Vfo.Split.Mode = hl.ModeName[txMode]
 		r.state.Vfo.Split.PbWidth = int32(txPbWidth)
+	}
+
+	// Double check if non of the above functions have disabled split
+	// accidentally (as it is the case for the TS-480 as of 15.4.2017)
+	checkSplitEnabled, _, err := r.rig.GetSplitVfo(vfo)
+	if err != nil {
+		return err
+	}
+
+	// clear if split has been (acidentally) deactivated
+	if !utils.Itob(checkSplitEnabled) {
+		r.state.Vfo.Split.Enabled = false
+		r.state.Vfo.Split.Frequency = 0
+		r.state.Vfo.Split.Mode = ""
+		r.state.Vfo.Split.Vfo = ""
+		r.state.Vfo.Split.PbWidth = 0
+		return errors.New("unable to set split")
 	}
 
 	return nil
