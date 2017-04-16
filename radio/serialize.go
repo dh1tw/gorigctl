@@ -20,7 +20,7 @@ func (r *radio) serializeCaps() (msg []byte, err error) {
 	caps.VfoOps = r.rig.Caps.Operations
 	caps.GetFunctions = r.rig.Caps.GetFunctions
 	caps.SetFunctions = r.rig.Caps.SetFunctions
-	caps.GetLevels = hlValuesToPbValues(r.rig.Caps.SetLevels)
+	caps.GetLevels = hlValuesToPbValues(r.rig.Caps.GetLevels)
 	caps.SetLevels = hlValuesToPbValues(r.rig.Caps.SetLevels)
 	caps.GetParameters = hlValuesToPbValues(r.rig.Caps.GetParameters)
 	caps.SetParameters = hlValuesToPbValues(r.rig.Caps.SetParameters)
