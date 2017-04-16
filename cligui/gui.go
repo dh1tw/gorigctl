@@ -820,7 +820,11 @@ func guiLoop(caps sbRadio.Capabilities, evPS *pubsub.PubSub) {
 	ui.Handle("/sys/kbd/<up>", func(ui.Event) {
 		if rg.radioOnline {
 			if (rg.caps.HasPowerstat && rg.state.RadioOn) || !rg.caps.HasPowerstat {
-				rg.internalFreq += float64(rg.state.Vfo.TuningStep)
+				ts := rg.state.Vfo.TuningStep
+				if ts == 0 {
+					ts = 100
+				}
+				rg.internalFreq += float64(ts)
 				freq := rg.internalFreq / 1000
 				cmd := []string{"set_freq", fmt.Sprintf("%.2f", freq)}
 				evPS.Pub(cmd, events.CliInput)
@@ -834,7 +838,11 @@ func guiLoop(caps sbRadio.Capabilities, evPS *pubsub.PubSub) {
 	ui.Handle("/sys/kbd/<down>", func(ui.Event) {
 		if rg.radioOnline {
 			if (rg.radioOnline && rg.state.RadioOn) || !rg.caps.HasPowerstat {
-				rg.internalFreq -= float64(rg.state.Vfo.TuningStep)
+				ts := rg.state.Vfo.TuningStep
+				if ts == 0 {
+					ts = 100
+				}
+				rg.internalFreq -= float64(ts)
 				freq := rg.internalFreq / 1000
 				cmd := []string{"set_freq", fmt.Sprintf("%.2f", freq)}
 				evPS.Pub(cmd, events.CliInput)
