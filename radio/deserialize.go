@@ -30,24 +30,24 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 
 	// if r.state.RadioOn {
 
-	if ns.CurrentVfo != r.state.CurrentVfo {
-		r.appLogger.Println("updating vfo to", ns.CurrentVfo)
-		if err := r.updateCurrentVfo(ns.CurrentVfo); err != nil {
+	if ns.GetCurrentVfo() != r.state.CurrentVfo {
+		r.appLogger.Printf("%s requested to set vfo to %v", ns.GetUserId(), ns.GetCurrentVfo())
+		if err := r.updateCurrentVfo(ns.GetCurrentVfo()); err != nil {
 			r.radioLogger.Println(err)
 		}
 	}
 
-	if len(ns.VfoOperations) > 0 {
-		r.appLogger.Println("executing vfo operation(s)", ns.VfoOperations)
+	if len(ns.GetVfoOperations()) > 0 {
+		r.appLogger.Printf("%s requested execution of vfo operation(s) %v", ns.GetUserId(), ns.GetVfoOperations())
 		if err := r.execVfoOperations(ns.GetVfoOperations()); err != nil {
 			r.radioLogger.Println(err)
 		}
 	}
 
 	if ns.Md.HasFrequency {
-		if ns.Vfo.Frequency != r.state.Vfo.Frequency {
-			r.appLogger.Printf("updating frequency to %.0f Hz\n", ns.Vfo.Frequency)
-			if err := r.updateFrequency(ns.Vfo.Frequency); err != nil {
+		if ns.Vfo.GetFrequency() != r.state.Vfo.Frequency {
+			r.appLogger.Printf("%s requested to set frequency to %.0f Hz\n", ns.GetUserId(), ns.Vfo.GetFrequency())
+			if err := r.updateFrequency(ns.Vfo.GetFrequency()); err != nil {
 				r.radioLogger.Println(err)
 			}
 		}
@@ -55,7 +55,7 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasMode {
 		if ns.Vfo.GetMode() != r.state.Vfo.Mode {
-			r.appLogger.Println("updating mode to", ns.Vfo.Mode)
+			r.appLogger.Printf("%s requested to set mode to %v", ns.GetUserId(), ns.Vfo.GetMode())
 			if err := r.updateMode(ns.Vfo.GetMode(), ns.Vfo.GetPbWidth()); err != nil {
 				r.radioLogger.Println(err)
 			}
@@ -64,7 +64,7 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasPbWidth {
 		if ns.Vfo.GetPbWidth() != r.state.Vfo.PbWidth {
-			r.appLogger.Printf("updating pbwidth to %d Hz\n", ns.Vfo.PbWidth)
+			r.appLogger.Printf("%s requested to set pbwidth to %d Hz\n", ns.GetUserId(), ns.Vfo.GetPbWidth())
 			if err := r.updatePbWidth(ns.Vfo.GetPbWidth()); err != nil {
 				r.radioLogger.Println(err)
 			}
@@ -73,7 +73,7 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasAnt {
 		if ns.Vfo.GetAnt() != r.state.Vfo.Ant {
-			r.appLogger.Println("updating antenna to", ns.Vfo.Ant)
+			r.appLogger.Printf("%s requested to set antenna to %v\n", ns.GetUserId(), ns.Vfo.GetAnt())
 			if err := r.updateAntenna(ns.Vfo.GetAnt()); err != nil {
 				r.radioLogger.Println(err)
 			}
@@ -82,7 +82,7 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasRit {
 		if ns.Vfo.GetRit() != r.state.Vfo.Rit {
-			r.appLogger.Printf("updating rit to %d Hz\n", ns.Vfo.Rit)
+			r.appLogger.Printf("%s requested to set rit to %d Hz\n", ns.GetUserId(), ns.Vfo.GetRit())
 			if err := r.updateRit(ns.Vfo.GetRit()); err != nil {
 				r.radioLogger.Println(err)
 			}
@@ -91,7 +91,7 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasXit {
 		if ns.Vfo.GetXit() != r.state.Vfo.Xit {
-			r.appLogger.Printf("updating xit to %d Hz\n", ns.Vfo.Xit)
+			r.appLogger.Printf("%s requested to set xit to %d Hz\n", ns.GetUserId(), ns.Vfo.GetXit())
 			if err := r.updateXit(ns.Vfo.GetXit()); err != nil {
 				r.radioLogger.Println(err)
 			}
@@ -99,19 +99,17 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	}
 
 	if ns.Md.HasSplit {
-		if ns.Vfo.Split != nil {
-			if !reflect.DeepEqual(ns.Vfo.Split, r.state.Vfo.Split) {
-				r.appLogger.Println("updating split to", ns.Vfo.Split)
-				if err := r.updateSplit(ns.Vfo.Split); err != nil {
-					r.radioLogger.Println(err)
-				}
+		if !reflect.DeepEqual(ns.Vfo.GetSplit(), r.state.Vfo.Split) {
+			r.appLogger.Printf("%s requested to set split to %v\n", ns.GetUserId(), ns.Vfo.GetSplit())
+			if err := r.updateSplit(ns.Vfo.GetSplit()); err != nil {
+				r.radioLogger.Println(err)
 			}
 		}
 	}
 
 	if ns.Md.HasTuningStep {
 		if ns.Vfo.GetTuningStep() != r.state.Vfo.TuningStep {
-			r.appLogger.Printf("updating tuning step to %d Hz\n", ns.Vfo.TuningStep)
+			r.appLogger.Printf("%s requested to set tuning step to %d Hz\n", ns.GetUserId(), ns.Vfo.GetTuningStep())
 			if err := r.updateTs(ns.Vfo.GetTuningStep()); err != nil {
 				r.radioLogger.Println(err)
 			}
@@ -119,34 +117,28 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	}
 
 	if ns.Md.HasFunctions {
-		if ns.Vfo.Functions != nil {
-			if !reflect.DeepEqual(ns.Vfo.Functions, r.state.Vfo.Functions) {
-				r.appLogger.Println("updating one or more functions")
-				if err := r.updateFunctions(ns.Vfo.GetFunctions()); err != nil {
-					r.radioLogger.Println(err)
-				}
+		if !reflect.DeepEqual(ns.Vfo.GetFunctions(), r.state.Vfo.Functions) {
+			r.appLogger.Printf("%s requested to set one or more functions\n", ns.GetUserId())
+			if err := r.updateFunctions(ns.Vfo.GetFunctions()); err != nil {
+				r.radioLogger.Println(err)
 			}
 		}
 	}
 
 	if ns.Md.HasLevels {
-		if ns.Vfo.Levels != nil {
-			if !reflect.DeepEqual(ns.Vfo.Levels, r.state.Vfo.Levels) {
-				r.appLogger.Println("updating one or more levels")
-				if err := r.updateLevels(ns.Vfo.GetLevels()); err != nil {
-					r.radioLogger.Println(err)
-				}
+		if !reflect.DeepEqual(ns.Vfo.GetLevels(), r.state.Vfo.Levels) {
+			r.appLogger.Printf("%s requested to set one or more levels\n", ns.GetUserId())
+			if err := r.updateLevels(ns.Vfo.GetLevels()); err != nil {
+				r.radioLogger.Println(err)
 			}
 		}
 	}
 
 	if ns.Md.HasParameters {
-		if ns.Vfo.Parameters != nil {
-			if !reflect.DeepEqual(ns.Vfo.Parameters, r.state.Vfo.Parameters) {
-				r.appLogger.Println("updating one or more parameters")
-				if err := r.updateParams(ns.Vfo.GetParameters()); err != nil {
-					r.radioLogger.Println(err)
-				}
+		if !reflect.DeepEqual(ns.Vfo.GetParameters(), r.state.Vfo.Parameters) {
+			r.appLogger.Printf("%s requested to set one or more parameters\n", ns.GetUserId())
+			if err := r.updateParams(ns.Vfo.GetParameters()); err != nil {
+				r.radioLogger.Println(err)
 			}
 		}
 	}
@@ -154,7 +146,7 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasPtt {
 		if ns.GetPtt() != r.state.Ptt {
-			r.radioLogger.Println("updating ptt to", ns.Ptt)
+			r.radioLogger.Printf("%s requested to set ptt to %v\n", ns.GetUserId(), ns.GetPtt())
 			if err := r.updatePtt(ns.GetPtt()); err != nil {
 				r.radioLogger.Println(err)
 			}
@@ -164,13 +156,13 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasPollingInterval {
 		if ns.GetPollingInterval() != r.state.PollingInterval {
 			if ns.GetPollingInterval() > 0 {
-				r.radioLogger.Printf("updating rig polling interval to %dms\n", ns.PollingInterval)
+				r.radioLogger.Printf("%s requested to set rig polling interval to %dms\n", ns.GetUserId(), ns.GetPollingInterval())
 				newPollingInterval := time.Millisecond * time.Duration(ns.GetPollingInterval())
 				r.pollingTicker.Stop()
 				r.pollingTicker = time.NewTicker(newPollingInterval)
 				r.state.PollingInterval = ns.GetPollingInterval()
 			} else {
-				r.radioLogger.Println("stopped rig polling")
+				r.radioLogger.Printf("%s requested to stop rig polling\n", ns.GetUserId())
 				r.pollingTicker.Stop()
 				r.state.PollingInterval = 0
 			}
@@ -180,13 +172,13 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasSyncInterval {
 		if ns.GetSyncInterval() != r.state.SyncInterval {
 			if ns.GetSyncInterval() > 0 {
-				r.radioLogger.Printf("updating rig sync interval to %ds\n", ns.SyncInterval)
+				r.radioLogger.Printf("%s requested to set rig sync interval to %ds\n", ns.GetUserId(), ns.GetSyncInterval())
 				newSyncInterval := time.Second * time.Duration(ns.GetSyncInterval())
 				r.syncTicker.Stop()
 				r.syncTicker = time.NewTicker(newSyncInterval)
 				r.state.SyncInterval = ns.GetSyncInterval()
 			} else {
-				r.radioLogger.Println("stopped rig sync")
+				r.radioLogger.Printf("%s requested to stop rig sync\n", ns.GetUserId())
 				r.syncTicker.Stop()
 				r.state.SyncInterval = 0
 			}
