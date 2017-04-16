@@ -701,7 +701,7 @@ func (rg *radioGui) setPreamp(hasPreamp, powerOn bool, value float32) {
 			rg.preamp.TextBgColor = ui.ColorDefault
 		} else {
 			if value > 0 {
-				rg.preamp.Text = fmt.Sprintf("-%.0f dB", value)
+				rg.preamp.Text = fmt.Sprintf("%.0f dB", value)
 				rg.preamp.Bg = ui.ColorGreen
 				rg.preamp.TextBgColor = ui.ColorGreen
 			} else {
