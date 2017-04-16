@@ -20,6 +20,7 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasRadioOn {
 		if ns.GetRadioOn() != r.state.RadioOn {
+			r.appLogger.Printf("%s requested to set powerstat to %v", ns.GetUserId(), ns.GetRadioOn())
 			if err := r.updatePowerOn(ns.GetRadioOn()); err != nil {
 				r.radioLogger.Println(err)
 			}
