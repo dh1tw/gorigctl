@@ -4,37 +4,37 @@ import sbRadio "github.com/dh1tw/gorigctl/sb_radio"
 
 // Radio is the interface which is implemented by localRadio and remoteRadio
 type Radio interface {
-	GetCaps() sbRadio.Capabilities
-	GetState() sbRadio.State
-	GetFrequency() float64
+	GetCaps() (sbRadio.Capabilities, error)
+	GetState() (sbRadio.State, error)
+	GetFrequency() (float64, error)
 	SetFrequency(freq float64) error
-	GetMode() (string, int)
+	GetMode() (string, int, error)
 	SetMode(mode string, pbWidth int) error
-	GetVfo() string
+	GetVfo() (string, error)
 	SetVfo(string) error
-	GetRit() int
+	GetRit() (int, error)
 	SetRit(rit int) error
-	GetXit() int
+	GetXit() (int, error)
 	SetXit(xit int) error
-	GetAntenna() int
+	GetAntenna() (int, error)
 	SetAntenna(int) error
-	GetPtt() bool
+	GetPtt() (bool, error)
 	SetPtt(bool) error
 	ExecVfoOps([]string) error
-	GetTuningStep() int
+	GetTuningStep() (int, error)
 	SetTuningStep(int) error
-	GetPowerstat() bool
+	GetPowerstat() (bool, error)
 	SetPowerstat(bool) error
-	GetSplitVfo() (string, bool)
+	GetSplitVfo() (string, bool, error)
 	SetSplitVfo(string, bool) error
-	GetSplitFrequency() float64
+	GetSplitFrequency() (float64, error)
 	SetSplitFrequency(float64) error
-	GetSplitMode() (string, int)
+	GetSplitMode() (string, int, error)
 	SetSplitMode(string, int) error
-	GetSplitPbWidth() int
+	GetSplitPbWidth() (int, error)
 	SetSplitPbWidth(int) error
 	SetSplitFrequencyMode(float64, string, int) error
-	GetSplitFrequencyMode() (float64, string, int)
+	GetSplitFrequencyMode() (float64, string, int, error)
 	GetFunction(string) (bool, error)
 	SetFunction(string, bool) error
 	GetLevel(string) (float32, error)

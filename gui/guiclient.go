@@ -67,13 +67,16 @@ func StartGui(gs GuiSettings) {
 	pongCh := gs.Events.Sub(events.Pong)
 	radioOnlineCh := gs.Events.Sub(events.RadioOnline)
 
-	go guiLoop(gui.radio.GetCaps(), gs.Events)
+	caps, _ := gui.radio.GetCaps()
+
+	go guiLoop(caps, gs.Events)
 
 	for {
 		select {
 		case msg := <-gs.CapabilitiesCh:
 			gui.radio.DeserializeCaps(msg)
-			ui.SendCustomEvt("/radio/caps", gui.radio.GetCaps())
+			caps, _ := gui.radio.GetCaps()
+			ui.SendCustomEvt("/radio/caps", caps)
 
 		case msg := <-gs.CatResponseCh:
 			// r.printRigUpdates = true
@@ -81,7 +84,8 @@ func StartGui(gs GuiSettings) {
 			if err != nil {
 				ui.SendCustomEvt("/log/msg", err.Error())
 			}
-			ui.SendCustomEvt("/radio/state", gui.radio.GetState())
+			state, _ := gui.radio.GetState()
+			ui.SendCustomEvt("/radio/state", state)
 
 		case msg := <-gs.RadioStatusCh:
 			gui.radio.DeserializeRadioStatus(msg)

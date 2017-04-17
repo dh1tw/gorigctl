@@ -7,16 +7,16 @@ import (
 	sbRadio "github.com/dh1tw/gorigctl/sb_radio"
 )
 
-func (r *RemoteRadio) GetCaps() sbRadio.Capabilities {
-	return r.caps
+func (r *RemoteRadio) GetCaps() (sbRadio.Capabilities, error) {
+	return r.caps, nil
 }
 
-func (r *RemoteRadio) GetState() sbRadio.State {
-	return r.state
+func (r *RemoteRadio) GetState() (sbRadio.State, error) {
+	return r.state, nil
 }
 
-func (r *RemoteRadio) GetFrequency() float64 {
-	return r.state.Vfo.Frequency
+func (r *RemoteRadio) GetFrequency() (float64, error) {
+	return r.state.Vfo.Frequency, nil
 }
 
 func (r *RemoteRadio) SetFrequency(freq float64) error {
@@ -26,8 +26,8 @@ func (r *RemoteRadio) SetFrequency(freq float64) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetMode() (string, int) {
-	return r.state.Vfo.Mode, int(r.state.Vfo.PbWidth)
+func (r *RemoteRadio) GetMode() (string, int, error) {
+	return r.state.Vfo.Mode, int(r.state.Vfo.PbWidth), nil
 }
 
 func (r *RemoteRadio) SetMode(mode string, pbWidth int) error {
@@ -42,8 +42,8 @@ func (r *RemoteRadio) SetMode(mode string, pbWidth int) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetVfo() string {
-	return r.state.CurrentVfo
+func (r *RemoteRadio) GetVfo() (string, error) {
+	return r.state.CurrentVfo, nil
 }
 
 func (r *RemoteRadio) SetVfo(vfo string) error {
@@ -52,8 +52,8 @@ func (r *RemoteRadio) SetVfo(vfo string) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetRit() int {
-	return int(r.state.Vfo.Rit)
+func (r *RemoteRadio) GetRit() (int, error) {
+	return int(r.state.Vfo.Rit), nil
 }
 
 func (r *RemoteRadio) SetRit(rit int) error {
@@ -63,8 +63,8 @@ func (r *RemoteRadio) SetRit(rit int) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetXit() int {
-	return int(r.state.Vfo.Xit)
+func (r *RemoteRadio) GetXit() (int, error) {
+	return int(r.state.Vfo.Xit), nil
 }
 
 func (r *RemoteRadio) SetXit(xit int) error {
@@ -74,8 +74,8 @@ func (r *RemoteRadio) SetXit(xit int) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetAntenna() int {
-	return int(r.state.Vfo.Ant)
+func (r *RemoteRadio) GetAntenna() (int, error) {
+	return int(r.state.Vfo.Ant), nil
 }
 
 func (r *RemoteRadio) SetAntenna(ant int) error {
@@ -85,8 +85,8 @@ func (r *RemoteRadio) SetAntenna(ant int) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetPtt() bool {
-	return r.state.Ptt
+func (r *RemoteRadio) GetPtt() (bool, error) {
+	return r.state.Ptt, nil
 }
 
 func (r *RemoteRadio) SetPtt(ptt bool) error {
@@ -96,8 +96,8 @@ func (r *RemoteRadio) SetPtt(ptt bool) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetTuningStep() int {
-	return int(r.state.Vfo.TuningStep)
+func (r *RemoteRadio) GetTuningStep() (int, error) {
+	return int(r.state.Vfo.TuningStep), nil
 }
 
 func (r *RemoteRadio) SetTuningStep(ts int) error {
@@ -107,8 +107,8 @@ func (r *RemoteRadio) SetTuningStep(ts int) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetPowerstat() bool {
-	return r.state.RadioOn
+func (r *RemoteRadio) GetPowerstat() (bool, error) {
+	return r.state.RadioOn, nil
 }
 
 func (r *RemoteRadio) SetPowerstat(ps bool) error {
@@ -124,8 +124,8 @@ func (r *RemoteRadio) ExecVfoOps(ops []string) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetSplitVfo() (string, bool) {
-	return r.state.Vfo.Split.Vfo, r.state.Vfo.Split.Enabled
+func (r *RemoteRadio) GetSplitVfo() (string, bool, error) {
+	return r.state.Vfo.Split.Vfo, r.state.Vfo.Split.Enabled, nil
 }
 
 func (r *RemoteRadio) SetSplitVfo(vfo string, enabled bool) error {
@@ -136,8 +136,8 @@ func (r *RemoteRadio) SetSplitVfo(vfo string, enabled bool) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetSplitFrequency() float64 {
-	return r.state.Vfo.Split.Frequency
+func (r *RemoteRadio) GetSplitFrequency() (float64, error) {
+	return r.state.Vfo.Split.Frequency, nil
 }
 
 func (r *RemoteRadio) SetSplitFrequency(freq float64) error {
@@ -149,40 +149,43 @@ func (r *RemoteRadio) SetSplitFrequency(freq float64) error {
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetSplitMode() (string, int) {
-	return r.state.Vfo.Split.Mode, int(r.state.Vfo.Split.PbWidth)
+func (r *RemoteRadio) GetSplitMode() (string, int, error) {
+	return r.state.Vfo.Split.Mode, int(r.state.Vfo.Split.PbWidth), nil
 }
 
 func (r *RemoteRadio) SetSplitMode(mode string, pbWidth int) error {
 	req := r.initSetState()
 	req.Md.HasSplit = true
 	req.Vfo.Split.Enabled = r.state.Vfo.Split.Enabled
+	req.Vfo.Split.Vfo = r.state.Vfo.Split.Vfo
 	req.Vfo.Split.Mode = mode
 	req.Vfo.Split.PbWidth = int32(pbWidth)
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetSplitPbWidth() int {
-	return int(r.state.Vfo.Split.PbWidth)
+func (r *RemoteRadio) GetSplitPbWidth() (int, error) {
+	return int(r.state.Vfo.Split.PbWidth), nil
 }
 
 func (r *RemoteRadio) SetSplitPbWidth(pbWidth int) error {
 	req := r.initSetState()
 	req.Md.HasSplit = true
 	req.Vfo.Split.Enabled = r.state.Vfo.Split.Enabled
+	req.Vfo.Split.Vfo = r.state.Vfo.Split.Vfo
 	req.Vfo.Split.Mode = r.state.Vfo.Split.Mode
 	req.Vfo.Split.PbWidth = int32(pbWidth)
 	return r.sendCatRequest(req)
 }
 
-func (r *RemoteRadio) GetSplitFrequencyMode() (float64, string, int) {
-	return r.state.Vfo.Split.Frequency, r.state.Vfo.Split.Mode, int(r.state.Vfo.Split.PbWidth)
+func (r *RemoteRadio) GetSplitFrequencyMode() (float64, string, int, error) {
+	return r.state.Vfo.Split.Frequency, r.state.Vfo.Split.Mode, int(r.state.Vfo.Split.PbWidth), nil
 }
 
 func (r *RemoteRadio) SetSplitFrequencyMode(freq float64, mode string, pbWidth int) error {
 	req := r.initSetState()
 	req.Md.HasSplit = true
 	req.Vfo.Split.Enabled = r.state.Vfo.Split.Enabled
+	req.Vfo.Split.Vfo = r.state.Vfo.Split.Vfo
 	req.Vfo.Split.Frequency = freq
 	req.Vfo.Split.Mode = mode
 	req.Vfo.Split.PbWidth = int32(pbWidth)

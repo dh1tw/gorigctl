@@ -175,7 +175,7 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 			exitTimeout := time.NewTimer(time.Second)
 			go func() {
 				<-exitTimeout.C
-				os.Exit(0)
+				os.Exit(-1)
 			}()
 			wg.Wait()
 			os.Exit(0)

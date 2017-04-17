@@ -49,7 +49,13 @@ func init() {
 	serverMqttCmd.Flags().StringP("radio", "Y", "myradio", "Radio ID")
 	serverMqttCmd.Flags().DurationP("polling_interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig's meter values [ms] (0 = disabled)")
 	serverMqttCmd.Flags().DurationP("sync_interval", "k", time.Duration(time.Second*3), "Timer for syncing all values with the rig [s] (0 = disabled)")
-
+	serverMqttCmd.Flags().IntP("rig-model", "m", 1, "Hamlib Rig Model ID")
+	serverMqttCmd.Flags().IntP("baudrate", "b", 38400, "Baudrate")
+	serverMqttCmd.Flags().StringP("portname", "o", "/dev/mhux/cat", "Portname (e.g. COM1)")
+	serverMqttCmd.Flags().IntP("databits", "d", 8, "Databits")
+	serverMqttCmd.Flags().IntP("stopbits", "s", 1, "Stopbits")
+	serverMqttCmd.Flags().StringP("parity", "r", "none", "Parity")
+	serverMqttCmd.Flags().StringP("handshake", "a", "none", "Handshake")
 }
 
 func mqttRadioServer(cmd *cobra.Command, args []string) {

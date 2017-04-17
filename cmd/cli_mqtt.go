@@ -151,7 +151,7 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 			exitTicker := time.NewTicker(time.Second)
 			go func() {
 				<-exitTicker.C
-				os.Exit(0)
+				os.Exit(-1)
 			}()
 			wg.Wait()
 			os.Exit(0)
