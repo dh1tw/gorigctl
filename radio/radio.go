@@ -5,6 +5,7 @@ import sbRadio "github.com/dh1tw/gorigctl/sb_radio"
 // Radio is the interface which is implemented by localRadio and remoteRadio
 type Radio interface {
 	GetCaps() sbRadio.Capabilities
+	GetState() sbRadio.State
 	GetFrequency() float64
 	SetFrequency(freq float64) error
 	GetMode() (string, int)
@@ -40,6 +41,4 @@ type Radio interface {
 	SetLevel(string, float32) error
 	GetParameter(string) (float32, error)
 	SetParameter(string, float32) error
-	Print(v ...interface{})
-	Printf(format string, v ...interface{})
 }

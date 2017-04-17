@@ -12,7 +12,6 @@ import (
 	"github.com/dh1tw/gorigctl/events"
 	"github.com/dh1tw/gorigctl/gui"
 	"github.com/dh1tw/gorigctl/ping"
-	"github.com/dh1tw/gorigctl/serverstatus"
 	"github.com/dh1tw/gorigctl/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -151,12 +150,12 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 		UserID:          userID,
 	}
 
-	serverStatusSettings := serverstatus.Settings{
-		Waitgroup:      &wg,
-		ServerStatusCh: toDeserializeStatusCh,
-		Events:         evPS,
-		Logger:         appLogger,
-	}
+	// serverStatusSettings := serverstatus.Settings{
+	// 	Waitgroup:      &wg,
+	// 	ServerStatusCh: toDeserializeStatusCh,
+	// 	Events:         evPS,
+	// 	Logger:         appLogger,
+	// }
 
 	wg.Add(4) //MQTT + ping + cligui + MonitorServerStatus
 
@@ -164,7 +163,7 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 
 	go ping.CheckLatency(pingSettings)
 	go gui.StartGui(guiSettings)
-	go serverstatus.MonitorServerStatus(serverStatusSettings)
+	// go serverstatus.MonitorServerStatus(serverStatusSettings)
 	go time.Sleep(200 * time.Millisecond)
 	go comms.MqttClient(mqttSettings)
 

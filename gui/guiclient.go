@@ -1,8 +1,10 @@
 package gui
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	"github.com/cskr/pubsub"
@@ -13,6 +15,7 @@ import (
 	sbLog "github.com/dh1tw/gorigctl/sb_log"
 	"github.com/dh1tw/gorigctl/utils"
 	ui "github.com/gizak/termui"
+	"github.com/olekukonko/tablewriter"
 )
 
 type GuiSettings struct {
@@ -29,10 +32,11 @@ type GuiSettings struct {
 }
 
 type gui struct {
-	cliCmds  []cli.CliCmd
-	radio    remoteradio.RemoteRadio
-	settings GuiSettings
-	logger   *log.Logger
+	cliCmds       []cli.CliCmd
+	remoteCliCmds []remoteradio.RemoteCliCmd
+	radio         remoteradio.RemoteRadio
+	settings      GuiSettings
+	logger        *log.Logger
 }
 
 func StartGui(gs GuiSettings) {
@@ -45,9 +49,10 @@ func StartGui(gs GuiSettings) {
 	logger := utils.NewChLogger(gs.Events, events.AppLog, "")
 	gui.logger = logger
 
-	gui.radio = remoteradio.NewRemoteRadio(gs.CatRequestTopic, gs.UserID, gs.ToWireCh, logger)
+	gui.radio = remoteradio.NewRemoteRadio(gs.CatRequestTopic, gs.UserID, gs.ToWireCh, logger, gs.Events)
 	gui.settings = gs
 	gui.cliCmds = cli.PopulateCliCmds()
+	gui.remoteCliCmds = remoteradio.GetRemoteCliCmds()
 
 	loggingCh := gs.Events.Sub(events.AppLog)
 
@@ -60,7 +65,7 @@ func StartGui(gs GuiSettings) {
 
 	cliInputCh := gs.Events.Sub(events.CliInput)
 	pongCh := gs.Events.Sub(events.Pong)
-	serverStatusCh := gs.Events.Sub(events.ServerOnline)
+	radioOnlineCh := gs.Events.Sub(events.RadioOnline)
 
 	go guiLoop(gui.radio.GetCaps(), gs.Events)
 
@@ -92,11 +97,11 @@ func StartGui(gs GuiSettings) {
 			// approriate window
 			ui.SendCustomEvt("/log/msg", msg)
 
-		case msg := <-serverStatusCh:
+		case msg := <-radioOnlineCh:
 			if msg.(bool) {
-				logger.Println("Radio Online")
+				logger.Println("radio is online")
 			} else {
-				logger.Println("Radio Offline")
+				logger.Println("radio is offline")
 			}
 			ui.SendCustomEvt("/radio/status", msg.(bool))
 
@@ -104,7 +109,7 @@ func StartGui(gs GuiSettings) {
 			ui.SendCustomEvt("/network/latency", msg)
 
 		case <-shutdownCh:
-			log.Println("Disconnecting from Radio")
+			log.Println("disconnecting from radio")
 			return
 		}
 	}
@@ -127,11 +132,52 @@ func (rg *gui) parseCli(cliInput []string) {
 	found := false
 	for _, cmd := range rg.cliCmds {
 		if cmd.Name == cliInput[0] || cmd.Shortcut == cliInput[0] {
-			cmd.Cmd(&rg.radio, cliInput[1:])
+			cmd.Cmd(&rg.radio, rg.logger, cliInput[1:])
 			found = true
 		}
 	}
+
+	for _, cmd := range rg.remoteCliCmds {
+		if cmd.Name == cliInput[0] || cmd.Shortcut == cliInput[0] {
+			cmd.Cmd(&rg.radio, rg.logger, cliInput[1:])
+			found = true
+		}
+	}
+
+	if cliInput[0] == "help" || cliInput[0] == "?" {
+		rg.PrintHelp(rg.logger)
+		found = true
+	}
+
 	if !found {
-		rg.radio.Print("unknown command")
+		rg.logger.Println("unknown command")
+	}
+}
+
+func (rg *gui) PrintHelp(log *log.Logger) {
+
+	buf := bytes.Buffer{}
+
+	table := tablewriter.NewWriter(&buf)
+	table.SetHeader([]string{"Command", "Shortcut", "Parameter"})
+	table.SetCenterSeparator("|")
+	table.SetRowLine(true)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetColWidth(50)
+
+	for _, el := range rg.cliCmds {
+		table.Append([]string{el.Name, el.Shortcut, el.Parameters})
+	}
+
+	for _, el := range rg.remoteCliCmds {
+		table.Append([]string{el.Name, el.Shortcut, el.Parameters})
+	}
+
+	table.Render()
+
+	lines := strings.Split(buf.String(), "\n")
+
+	for _, line := range lines {
+		log.Println(line)
 	}
 }

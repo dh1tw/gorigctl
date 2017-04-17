@@ -33,6 +33,9 @@ func (r *RemoteRadio) GetMode() (string, int) {
 func (r *RemoteRadio) SetMode(mode string, pbWidth int) error {
 	req := r.initSetState()
 	req.Md.HasMode = true
+	if pbWidth > 0 {
+		req.Md.HasPbWidth = true
+	}
 	req.Vfo.Mode = mode
 	req.Vfo.PbWidth = int32(pbWidth)
 
@@ -235,6 +238,11 @@ func (r *RemoteRadio) SetParameter(parm string, value float32) error {
 }
 
 func (r *RemoteRadio) sendCatRequest(req sbRadio.SetState) error {
+
+	if !r.radioOnline {
+		return errors.New("unable to send request since radio is offline")
+	}
+
 	data, err := req.Marshal()
 	if err != nil {
 		return err

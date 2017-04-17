@@ -12,8 +12,8 @@ import (
 	"github.com/cskr/pubsub"
 	"github.com/dh1tw/gorigctl/comms"
 	"github.com/dh1tw/gorigctl/events"
-	"github.com/dh1tw/gorigctl/localradio"
 	"github.com/dh1tw/gorigctl/ping"
+	"github.com/dh1tw/gorigctl/radioserver"
 	"github.com/dh1tw/gorigctl/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -128,7 +128,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		Retain: true,
 	}
 
-	appLogger := utils.NewStdLogger("")
+	appLogger := utils.NewStdLogger("", log.Ltime)
 	radioLogger := utils.NewChLogger(evPS, events.RadioLog, "")
 
 	mqttSettings := comms.MqttSettings{
@@ -185,7 +185,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	pollingInterval := viper.GetDuration("radio.polling_interval")
 	syncInterval := viper.GetDuration("radio.sync_interval")
 
-	radioSettings := localRadio.RadioSettings{
+	radioSettings := radioserver.RadioSettings{
 		RigModel:         rigModel,
 		Port:             port,
 		HlDebugLevel:     hlDebugLevel,
@@ -215,7 +215,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	go ping.EchoPing(pongSettings)
 
 	time.Sleep(time.Millisecond * 500)
-	go localRadio.HandleRadio(radioSettings)
+	go radioserver.StartRadioServer(radioSettings)
 
 	status := serverStatus{}
 	status.statusTopic = serverStatusTopic

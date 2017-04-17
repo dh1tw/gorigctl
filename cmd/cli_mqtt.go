@@ -1,16 +1,21 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/cskr/pubsub"
-	"github.com/dh1tw/gorigctl/cliclient"
+	"github.com/dh1tw/gorigctl/cli"
 	"github.com/dh1tw/gorigctl/comms"
 	"github.com/dh1tw/gorigctl/events"
+	"github.com/dh1tw/gorigctl/remoteradio"
 	"github.com/dh1tw/gorigctl/utils"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,6 +44,12 @@ func init() {
 	clientMqttCmd.Flags().StringP("radio", "Y", "myradio", "Radio ID")
 }
 
+type remoteCli struct {
+	cliCmds       []cli.CliCmd
+	remoteCliCmds []remoteradio.RemoteCliCmd
+	radio         remoteradio.RemoteRadio
+}
+
 func mqttCliClient(cmd *cobra.Command, args []string) {
 
 	// If a config file is found, read it in.
@@ -52,11 +63,11 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("mqtt.station", cmd.Flags().Lookup("station"))
 	viper.BindPFlag("mqtt.radio", cmd.Flags().Lookup("radio"))
 
-	// userID := "unknown_" + utils.RandStringRunes(5)
+	userID := "unknown_" + utils.RandStringRunes(5)
 	mqttClientID := "unknown_" + utils.RandStringRunes(5)
 
 	if viper.IsSet("general.user_id") {
-		// userID = viper.GetString("general.user_id")
+		userID = viper.GetString("general.user_id")
 		mqttClientID = viper.GetString("general.user_id") + utils.RandStringRunes(5)
 	}
 
@@ -69,15 +80,12 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 
 	serverCatRequestTopic := baseTopic + "/setstate"
 	serverStatusTopic := baseTopic + "/status"
-	//	serverPingTopic := baseTopic + "/ping"
-	// errorTopic := baseTopic + "/error"
 
 	// tx topics
 	serverCatResponseTopic := baseTopic + "/state"
 	serverCapsTopic := baseTopic + "/caps"
-	serverPongTopic := baseTopic + "/pong"
 
-	mqttRxTopics := []string{serverCatResponseTopic, serverCapsTopic, serverPongTopic, serverStatusTopic}
+	mqttRxTopics := []string{serverCatResponseTopic, serverCapsTopic, serverStatusTopic}
 
 	toWireCh := make(chan comms.IOMsg, 20)
 	toDeserializeCatResponseCh := make(chan []byte, 10)
@@ -91,7 +99,8 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 	// WaitGroup to coordinate a graceful shutdown
 	var wg sync.WaitGroup
 
-	logger := utils.NewChLogger(evPS, events.AppLog, "")
+	// logger := utils.NewChLogger(evPS, events.AppLog, "")
+	logger := utils.NewStdLogger("", 0)
 
 	mqttSettings := comms.MqttSettings{
 		WaitGroup:  &wg,
@@ -110,24 +119,20 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 		Logger:                      logger,
 	}
 
-	remoteRadioSettings := cliClient.RemoteRadioSettings{
-		CatResponseCh:   toDeserializeCatResponseCh,
-		RadioStatusCh:   toDeserializeStatusCh,
-		CapabilitiesCh:  toDeserializeCapsCh,
-		ToWireCh:        toWireCh,
-		CatRequestTopic: serverCatRequestTopic,
-		Events:          evPS,
-		WaitGroup:       &wg,
-	}
-
-	wg.Add(3) //MQTT + RemoteRadio + SysEvents
+	wg.Add(3) //MQTT + SysEvents
 
 	connectionStatusCh := evPS.Sub(events.MqttConnStatus)
 	prepareShutdownCh := evPS.Sub(events.PrepareShutdown)
 	shutdownCh := evPS.Sub(events.Shutdown)
+	cliInputCh := evPS.Sub(events.CliInput)
+	radioOnlineCh := evPS.Sub(events.RadioOnline)
+
+	rcli := remoteCli{}
+	rcli.radio = remoteradio.NewRemoteRadio(serverCatRequestTopic, userID, toWireCh, logger, evPS)
+	rcli.cliCmds = cli.PopulateCliCmds()
+	rcli.remoteCliCmds = remoteradio.GetRemoteCliCmds()
 
 	go events.WatchSystemEvents(evPS, &wg)
-	go cliClient.HandleRemoteRadio(remoteRadioSettings)
 	time.Sleep(200 * time.Millisecond)
 	go comms.MqttClient(mqttSettings)
 	go events.CaptureKeyboard(evPS)
@@ -138,7 +143,6 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 		// CTRL-C has been pressed; let's prepare the shutdown
 		case <-prepareShutdownCh:
 			// advice that we are going offline
-			time.Sleep(time.Millisecond * 200)
 			evPS.Pub(true, events.Shutdown)
 
 		// shutdown the application gracefully
@@ -152,10 +156,102 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 			wg.Wait()
 			os.Exit(0)
 
+		case msg := <-toDeserializeCapsCh:
+			if err := rcli.radio.DeserializeCaps(msg); err != nil {
+				logger.Println(err)
+			}
+
+		case msg := <-toDeserializeCatResponseCh:
+			if err := rcli.radio.DeserializeCatResponse(msg); err != nil {
+				logger.Println(err)
+			}
+
+		case msg := <-toDeserializeStatusCh:
+			if err := rcli.radio.DeserializeRadioStatus(msg); err != nil {
+				logger.Println(err)
+			}
+
+		case msg := <-cliInputCh:
+			rcli.parseCli(logger, msg.([]string))
+
 		case ev := <-connectionStatusCh:
 			connStatus := ev.(int)
 			if connStatus == comms.CONNECTED {
+
+			}
+		case ev := <-radioOnlineCh:
+			radioOnline := ev.(bool)
+			if radioOnline {
+				fmt.Println("radio is online")
+				fmt.Println()
+				fmt.Printf("rig command: ")
+			} else {
+				logger.Println("radio is offline")
 			}
 		}
+	}
+}
+
+func (rcli *remoteCli) parseCli(logger *log.Logger, cliInput []string) {
+
+	found := false
+
+	if len(cliInput) == 0 {
+		fmt.Printf("rig command: ")
+		return
+	}
+
+	for _, cmd := range rcli.cliCmds {
+		if cmd.Name == cliInput[0] || cmd.Shortcut == cliInput[0] {
+			cmd.Cmd(&rcli.radio, logger, cliInput[1:])
+			found = true
+		}
+	}
+
+	for _, cmd := range rcli.remoteCliCmds {
+		if cmd.Name == cliInput[0] || cmd.Shortcut == cliInput[0] {
+			cmd.Cmd(&rcli.radio, logger, cliInput[1:])
+			found = true
+		}
+	}
+
+	if cliInput[0] == "help" || cliInput[0] == "?" {
+		rcli.PrintHelp(logger)
+		found = true
+	}
+
+	if !found {
+		fmt.Println("unknown command")
+	}
+
+	fmt.Println()
+	fmt.Printf("rig command: ")
+}
+
+func (rcli *remoteCli) PrintHelp(log *log.Logger) {
+
+	buf := bytes.Buffer{}
+
+	table := tablewriter.NewWriter(&buf)
+	table.SetHeader([]string{"Command", "Shortcut", "Parameter"})
+	table.SetCenterSeparator("|")
+	table.SetRowLine(true)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetColWidth(50)
+
+	for _, el := range rcli.cliCmds {
+		table.Append([]string{el.Name, el.Shortcut, el.Parameters})
+	}
+
+	for _, el := range rcli.remoteCliCmds {
+		table.Append([]string{el.Name, el.Shortcut, el.Parameters})
+	}
+
+	table.Render()
+
+	lines := strings.Split(buf.String(), "\n")
+
+	for _, line := range lines {
+		log.Println(line)
 	}
 }

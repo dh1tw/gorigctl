@@ -7,10 +7,10 @@ import (
 	"github.com/cskr/pubsub"
 )
 
-func NewStdLogger(prefix string) *log.Logger {
+func NewStdLogger(prefix string, flags int) *log.Logger {
 
 	l := stdioLogger{}
-	logger := log.New(&l, prefix, log.Ltime)
+	logger := log.New(&l, prefix, flags)
 
 	return logger
 }
@@ -20,7 +20,7 @@ type stdioLogger struct {
 
 func (l *stdioLogger) Write(input []byte) (n int, err error) {
 
-	fmt.Print(string(input))
+	fmt.Printf("%v", string(input))
 	return len(input), nil
 }
 

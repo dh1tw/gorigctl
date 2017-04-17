@@ -3,6 +3,7 @@ package remoteradio
 import (
 	"reflect"
 
+	"github.com/dh1tw/gorigctl/events"
 	sbRadio "github.com/dh1tw/gorigctl/sb_radio"
 	sbStatus "github.com/dh1tw/gorigctl/sb_status"
 )
@@ -16,7 +17,7 @@ func (r *RemoteRadio) DeserializeRadioStatus(data []byte) error {
 
 	if r.radioOnline != rStatus.Online {
 		r.radioOnline = rStatus.Online
-		r.logger.Println("Radio Online:", r.radioOnline)
+		r.events.Pub(rStatus.Online, events.RadioOnline)
 	}
 
 	return nil
@@ -150,6 +151,12 @@ func (r *RemoteRadio) DeserializeCatResponse(msg []byte) error {
 		}
 	}
 
+	if ns.GetSyncInterval() != r.state.SyncInterval {
+		r.state.SyncInterval = ns.GetSyncInterval()
+		if r.printRigUpdates {
+			r.logger.Printf("Updated rig sync interval: %ds\n", r.state.SyncInterval)
+		}
+	}
 	return nil
 }
 
