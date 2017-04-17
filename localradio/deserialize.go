@@ -1,4 +1,4 @@
-package radio
+package localRadio
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 	"github.com/dh1tw/gorigctl/utils"
 )
 
-func (r *radio) deserializeCatRequest(request []byte) error {
+func (r *localRadio) deserializeCatRequest(request []byte) error {
 
 	ns := sbRadio.SetState{}
 	if err := ns.Unmarshal(request); err != nil {
@@ -189,7 +189,7 @@ func (r *radio) deserializeCatRequest(request []byte) error {
 	return nil
 }
 
-func (r *radio) updateCurrentVfo(newVfo string) error {
+func (r *localRadio) updateCurrentVfo(newVfo string) error {
 	if vfo, ok := hl.VfoValue[newVfo]; ok {
 		err := r.rig.SetVfo(vfo)
 		if err != nil {
@@ -202,7 +202,7 @@ func (r *radio) updateCurrentVfo(newVfo string) error {
 	return nil
 }
 
-func (r *radio) updateFrequency(newFreq float64) error {
+func (r *localRadio) updateFrequency(newFreq float64) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
 	// if the rig supports fast_commands, then we will use it
@@ -231,7 +231,7 @@ func (r *radio) updateFrequency(newFreq float64) error {
 	return nil
 }
 
-func (r *radio) execVfoOperations(vfoOps []string) error {
+func (r *localRadio) execVfoOperations(vfoOps []string) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 	for _, v := range vfoOps {
 		vfoOpValue, ok := hl.OperationValue[v]
@@ -260,7 +260,7 @@ func (r *radio) execVfoOperations(vfoOps []string) error {
 	return nil
 }
 
-func (r *radio) updateMode(newMode string, newPbWidth int32) error {
+func (r *localRadio) updateMode(newMode string, newPbWidth int32) error {
 
 	if !r.rig.Caps.HasSetMode || !r.rig.Caps.HasGetMode {
 		return errors.New("unable to update mode; function not implemented")
@@ -311,7 +311,7 @@ func (r *radio) updateMode(newMode string, newPbWidth int32) error {
 	return nil
 }
 
-func (r *radio) updatePbWidth(newPbWidth int32) error {
+func (r *localRadio) updatePbWidth(newPbWidth int32) error {
 
 	if !r.rig.Caps.HasSetMode || !r.rig.Caps.HasGetMode {
 		return errors.New("unable to update mode/filter; function not implemented")
@@ -344,7 +344,7 @@ func (r *radio) updatePbWidth(newPbWidth int32) error {
 	return nil
 }
 
-func (r *radio) updateAntenna(newAnt int32) error {
+func (r *localRadio) updateAntenna(newAnt int32) error {
 
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
@@ -362,7 +362,7 @@ func (r *radio) updateAntenna(newAnt int32) error {
 	return nil
 }
 
-func (r *radio) updateRit(newRit int32) error {
+func (r *localRadio) updateRit(newRit int32) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
 	err := r.rig.SetRit(vfo, int(newRit))
@@ -394,7 +394,7 @@ func (r *radio) updateRit(newRit int32) error {
 	return nil
 }
 
-func (r *radio) updateXit(newXit int32) error {
+func (r *localRadio) updateXit(newXit int32) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
 	err := r.rig.SetXit(vfo, int(newXit))
@@ -419,7 +419,7 @@ func (r *radio) updateXit(newXit int32) error {
 	return nil
 }
 
-func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
+func (r *localRadio) updateSplit(newSplit *sbRadio.Split) error {
 
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
@@ -588,7 +588,7 @@ func (r *radio) updateSplit(newSplit *sbRadio.Split) error {
 	return nil
 }
 
-func (r *radio) updateTs(newTs int32) error {
+func (r *localRadio) updateTs(newTs int32) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 	err := r.rig.SetTs(vfo, int(newTs))
 	if err != nil {
@@ -605,7 +605,7 @@ func (r *radio) updateTs(newTs int32) error {
 	return nil
 }
 
-func (r *radio) updateFunctions(newFuncs map[string]bool) error {
+func (r *localRadio) updateFunctions(newFuncs map[string]bool) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
 	// functions to be enabled
@@ -643,7 +643,7 @@ func (r *radio) updateFunctions(newFuncs map[string]bool) error {
 	return nil
 }
 
-func (r *radio) updateLevels(newLevels map[string]float32) error {
+func (r *localRadio) updateLevels(newLevels map[string]float32) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
 	// iterate over all new Levels in the map
@@ -699,7 +699,7 @@ func (r *radio) updateLevels(newLevels map[string]float32) error {
 	return nil
 }
 
-func (r *radio) updateParams(newParams map[string]float32) error {
+func (r *localRadio) updateParams(newParams map[string]float32) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 
 	// iterate over all new Levels in the map
@@ -755,7 +755,7 @@ func (r *radio) updateParams(newParams map[string]float32) error {
 	return nil
 }
 
-func (r *radio) updatePowerOn(pwrOn bool) error {
+func (r *localRadio) updatePowerOn(pwrOn bool) error {
 
 	if !r.rig.Caps.HasSetPowerStat || !r.rig.Caps.HasGetPowerStat {
 		return errors.New("radio doesn't support set/get powerstat")
@@ -798,7 +798,7 @@ func (r *radio) updatePowerOn(pwrOn bool) error {
 	return nil
 }
 
-func (r *radio) updatePtt(ptt bool) error {
+func (r *localRadio) updatePtt(ptt bool) error {
 	vfo, _ := hl.VfoValue[r.state.CurrentVfo]
 	var pttValue int
 	if ptt {

@@ -30,7 +30,6 @@ type RemoteRadioSettings struct {
 
 type remoteRadio struct {
 	state           sbRadio.State
-	newState        sbRadio.SetState
 	caps            sbRadio.Capabilities
 	settings        RemoteRadioSettings
 	cliCmds         []cliCmd
@@ -251,7 +250,7 @@ func (r *remoteRadio) deserializeCatResponse(msg []byte) error {
 		if ns.Vfo.GetFrequency() != r.state.Vfo.Frequency {
 			r.state.Vfo.Frequency = ns.Vfo.GetFrequency()
 			if r.printRigUpdates {
-				fmt.Printf("Updated Frequency: %.3fkHz\n", r.state.Vfo.Frequency/1000)
+				fmt.Printf("Updated Frequency: %.3f kHz\n", r.state.Vfo.Frequency/1000)
 			}
 		}
 
@@ -265,7 +264,7 @@ func (r *remoteRadio) deserializeCatResponse(msg []byte) error {
 		if ns.Vfo.GetPbWidth() != r.state.Vfo.PbWidth {
 			r.state.Vfo.PbWidth = ns.Vfo.GetPbWidth()
 			if r.printRigUpdates {
-				fmt.Printf("Updated Filter: %dHz\n", r.state.Vfo.PbWidth)
+				fmt.Printf("Updated Filter: %d Hz\n", r.state.Vfo.PbWidth)
 			}
 		}
 
@@ -279,14 +278,14 @@ func (r *remoteRadio) deserializeCatResponse(msg []byte) error {
 		if ns.Vfo.GetRit() != r.state.Vfo.Rit {
 			r.state.Vfo.Rit = ns.Vfo.GetRit()
 			if r.printRigUpdates {
-				fmt.Printf("Updated Rit: %dHz\n", r.state.Vfo.Rit)
+				fmt.Printf("Updated Rit: %d Hz\n", r.state.Vfo.Rit)
 			}
 		}
 
 		if ns.Vfo.GetXit() != r.state.Vfo.Xit {
 			r.state.Vfo.Xit = ns.Vfo.GetXit()
 			if r.printRigUpdates {
-				fmt.Printf("Updated Xit: %dHz\n", r.state.Vfo.Xit)
+				fmt.Printf("Updated Xit: %d Hz\n", r.state.Vfo.Xit)
 			}
 		}
 
@@ -301,7 +300,7 @@ func (r *remoteRadio) deserializeCatResponse(msg []byte) error {
 		if ns.Vfo.GetTuningStep() != r.state.Vfo.TuningStep {
 			r.state.Vfo.TuningStep = ns.Vfo.GetTuningStep()
 			if r.printRigUpdates {
-				fmt.Printf("Updated Tuning Step: %dHz\n", r.state.Vfo.TuningStep)
+				fmt.Printf("Updated Tuning Step: %d Hz\n", r.state.Vfo.TuningStep)
 			}
 		}
 
@@ -367,7 +366,7 @@ func (r *remoteRadio) updateSplit(newSplit *sbRadio.Split) error {
 	if newSplit.GetFrequency() != r.state.Vfo.Split.Frequency {
 		r.state.Vfo.Split.Frequency = newSplit.GetFrequency()
 		if r.printRigUpdates {
-			fmt.Printf("Updated TX (Split) Frequency: %.3fkHz\n", r.state.Vfo.Split.Frequency/1000)
+			fmt.Printf("Updated TX (Split) Frequency: %.3f kHz\n", r.state.Vfo.Split.Frequency/1000)
 		}
 	}
 
@@ -389,7 +388,7 @@ func (r *remoteRadio) updateSplit(newSplit *sbRadio.Split) error {
 
 		r.state.Vfo.Split.PbWidth = newSplit.GetPbWidth()
 		if r.printRigUpdates {
-			fmt.Printf("Split PbWidth: %dHz\n", r.state.Vfo.Split.PbWidth)
+			fmt.Printf("Split PbWidth: %d Hz\n", r.state.Vfo.Split.PbWidth)
 		}
 	}
 

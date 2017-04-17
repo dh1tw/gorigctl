@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/cskr/pubsub"
-	"github.com/dh1tw/gorigctl/cligui"
 	"github.com/dh1tw/gorigctl/comms"
 	"github.com/dh1tw/gorigctl/events"
+	"github.com/dh1tw/gorigctl/gui"
 	"github.com/dh1tw/gorigctl/ping"
 	"github.com/dh1tw/gorigctl/serverstatus"
 	"github.com/dh1tw/gorigctl/utils"
@@ -139,7 +139,7 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 		Logger:                      appLogger,
 	}
 
-	remoteRadioSettings := cligui.RemoteRadioSettings{
+	guiSettings := gui.GuiSettings{
 		CatResponseCh:   toDeserializeCatResponseCh,
 		RadioStatusCh:   toDeserializeStatusCh,
 		CapabilitiesCh:  toDeserializeCapsCh,
@@ -163,7 +163,7 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 	shutdownCh := evPS.Sub(events.Shutdown)
 
 	go ping.CheckLatency(pingSettings)
-	go cligui.HandleRemoteRadio(remoteRadioSettings)
+	go gui.StartGui(guiSettings)
 	go serverstatus.MonitorServerStatus(serverStatusSettings)
 	go time.Sleep(200 * time.Millisecond)
 	go comms.MqttClient(mqttSettings)

@@ -1,18 +1,18 @@
-package radio
+package localRadio
 
 import (
 	hl "github.com/dh1tw/goHamlib"
 	sbRadio "github.com/dh1tw/gorigctl/sb_radio"
 )
 
-func (r *radio) serializeState() (msg []byte, err error) {
+func (r *localRadio) serializeState() (msg []byte, err error) {
 
 	msg, err = r.state.Marshal()
 
 	return msg, err
 }
 
-func (r *radio) serializeCaps() (msg []byte, err error) {
+func (r *localRadio) serializeCaps() (msg []byte, err error) {
 
 	caps := sbRadio.Capabilities{}
 	caps.Vfos = r.rig.Caps.Vfos
