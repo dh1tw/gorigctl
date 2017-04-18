@@ -59,7 +59,7 @@ the latest updates and new rigs.
 ### Linux (Ubuntu >= 14.04)
 
 ```bash
-$ sudo apt-get install -y libhamlib2
+$ sudo apt-get install -y libhamlib2 libhamlib-dev
 ```
 
 ### MacOS
