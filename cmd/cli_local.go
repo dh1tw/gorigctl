@@ -92,8 +92,6 @@ func runLocalCli(cmd *cobra.Command, args []string) {
 
 	logger := utils.NewStdLogger("", 0)
 
-	fmt.Println(rigModel)
-
 	lr, err := localradio.NewLocalRadio(rigModel, debugLevel, port, logger)
 	if err != nil {
 		fmt.Println("Unable to initialize radio:", err)

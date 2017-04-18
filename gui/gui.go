@@ -805,7 +805,7 @@ func (rg *radioGui) syncFrequency(ev ui.Event) {
 	ui.Render(rg.frequency)
 }
 
-func Loop(caps sbRadio.Capabilities, evPS *pubsub.PubSub) {
+func Loop(evPS *pubsub.PubSub) {
 
 	rg := &radioGui{}
 	rg.init()

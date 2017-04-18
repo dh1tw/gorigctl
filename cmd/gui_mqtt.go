@@ -152,11 +152,16 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 		Logger:                      appLogger,
 	}
 
-	wg.Add(3) //MQTT + ping + cligui
+	wg.Add(2) //MQTT + ping
 
 	rGui := remoteGui{}
 
 	shutdownCh := evPS.Sub(events.Shutdown)
+	cliInputCh := evPS.Sub(events.CliInput)
+	pongCh := evPS.Sub(events.Pong)
+	radioOnlineCh := evPS.Sub(events.RadioOnline)
+	loggingCh := evPS.Sub(events.AppLog)
+
 	logger := utils.NewChLogger(evPS, events.AppLog, "")
 	rGui.logger = logger
 
@@ -171,17 +176,9 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 	defer ui.Close()
 
 	go ping.CheckLatency(pingSettings)
-	go time.Sleep(200 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	go comms.MqttClient(mqttSettings)
-
-	cliInputCh := evPS.Sub(events.CliInput)
-	pongCh := evPS.Sub(events.Pong)
-	radioOnlineCh := evPS.Sub(events.RadioOnline)
-	loggingCh := evPS.Sub(events.AppLog)
-
-	caps, _ := rGui.radio.GetCaps()
-
-	go gui.Loop(caps, evPS)
+	go gui.Loop(evPS)
 
 	for {
 		select {
