@@ -54,6 +54,7 @@ func StartRadioServer(rs RadioSettings) {
 	r.rig = hl.Rig{}
 	r.state = sbRadio.State{}
 	r.state.Vfo = &sbRadio.Vfo{}
+	r.state.Vfo.Split = &sbRadio.Split{}
 	r.state.Vfo.Levels = make(map[string]float32)
 	r.state.Vfo.Parameters = make(map[string]float32)
 	r.state.Vfo.Functions = make(map[string]bool)
