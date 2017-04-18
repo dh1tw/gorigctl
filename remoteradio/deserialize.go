@@ -1,138 +1,14 @@
-package cligui
+package remoteradio
 
 import (
-	"log"
 	"reflect"
-	"sync"
 
-	"github.com/cskr/pubsub"
-	"github.com/dh1tw/gorigctl/comms"
 	"github.com/dh1tw/gorigctl/events"
-	sbLog "github.com/dh1tw/gorigctl/sb_log"
 	sbRadio "github.com/dh1tw/gorigctl/sb_radio"
 	sbStatus "github.com/dh1tw/gorigctl/sb_status"
-	"github.com/dh1tw/gorigctl/utils"
-	ui "github.com/gizak/termui"
 )
 
-type RemoteRadioSettings struct {
-	CatResponseCh   chan []byte
-	RadioStatusCh   chan []byte
-	CatRequestTopic string
-	RadioLogCh      chan []byte
-	PongCh          chan []int64
-	ToWireCh        chan comms.IOMsg
-	CapabilitiesCh  chan []byte
-	WaitGroup       *sync.WaitGroup
-	Events          *pubsub.PubSub
-	UserID          string
-}
-
-type remoteRadio struct {
-	state           sbRadio.State
-	newState        sbRadio.SetState
-	caps            sbRadio.Capabilities
-	settings        RemoteRadioSettings
-	cliCmds         []cliCmd
-	printRigUpdates bool
-	userID          string
-	radioOnline     bool
-	logger          *log.Logger
-}
-
-type cliCmd struct {
-	Cmd         func(r *remoteRadio, args []string)
-	Name        string
-	Shortcut    string
-	Parameters  string
-	Description string
-	Example     string
-}
-
-func HandleRemoteRadio(rs RemoteRadioSettings) {
-	defer rs.WaitGroup.Done()
-
-	shutdownCh := rs.Events.Sub(events.Shutdown)
-
-	r := remoteRadio{}
-	r.state.Vfo = &sbRadio.Vfo{}
-	r.state.Vfo.Functions = make(map[string]bool)
-	r.state.Vfo.Levels = make(map[string]float32)
-	r.state.Vfo.Parameters = make(map[string]float32)
-	r.state.Vfo.Split = &sbRadio.Split{}
-
-	r.settings = rs
-
-	r.cliCmds = make([]cliCmd, 0, 30)
-	r.populateCliCmds()
-
-	r.userID = rs.UserID
-
-	logger := utils.NewChLogger(rs.Events, events.AppLog, "")
-	r.logger = logger
-
-	loggingCh := rs.Events.Sub(events.AppLog)
-
-	// rs.Events.Pub(true, events.ForwardCat)
-
-	if err := ui.Init(); err != nil {
-		panic(err)
-	}
-	defer ui.Close()
-
-	cliInputCh := rs.Events.Sub(events.CliInput)
-	pongCh := rs.Events.Sub(events.Pong)
-	serverStatusCh := rs.Events.Sub(events.ServerOnline)
-
-	go guiLoop(r.caps, r.settings.Events)
-
-	for {
-		select {
-		case msg := <-rs.CapabilitiesCh:
-			r.deserializeCaps(msg)
-			ui.SendCustomEvt("/radio/caps", r.caps)
-
-		case msg := <-rs.CatResponseCh:
-			// r.printRigUpdates = true
-			err := r.deserializeCatResponse(msg)
-			if err != nil {
-				ui.SendCustomEvt("/log/msg", err.Error())
-			}
-			ui.SendCustomEvt("/radio/state", r.state)
-
-		case msg := <-rs.RadioStatusCh:
-			r.deserializeRadioStatus(msg)
-
-		case msg := <-cliInputCh:
-			r.parseCli(msg.([]string))
-
-		case msg := <-rs.RadioLogCh:
-			r.deserializeRadioLogMsg(msg)
-
-		case msg := <-loggingCh:
-			// forward to GUI event handler to be shown in the
-			// approriate window
-			ui.SendCustomEvt("/log/msg", msg)
-
-		case msg := <-serverStatusCh:
-			if msg.(bool) {
-				logger.Println("Radio Online")
-			} else {
-				logger.Println("Radio Offline")
-			}
-			ui.SendCustomEvt("/radio/status", msg.(bool))
-
-		case msg := <-pongCh:
-			ui.SendCustomEvt("/network/latency", msg)
-
-		case <-shutdownCh:
-			log.Println("Disconnecting from Radio")
-			return
-		}
-	}
-}
-
-func (r *remoteRadio) deserializeRadioStatus(data []byte) error {
+func (r *RemoteRadio) DeserializeRadioStatus(data []byte) error {
 
 	rStatus := sbStatus.Status{}
 	if err := rStatus.Unmarshal(data); err != nil {
@@ -141,30 +17,13 @@ func (r *remoteRadio) deserializeRadioStatus(data []byte) error {
 
 	if r.radioOnline != rStatus.Online {
 		r.radioOnline = rStatus.Online
-		r.logger.Println("Radio Online:", r.radioOnline)
+		r.events.Pub(rStatus.Online, events.RadioOnline)
 	}
 
 	return nil
 }
 
-func (r *remoteRadio) sendCatRequest(req sbRadio.SetState) error {
-	data, err := req.Marshal()
-	if err != nil {
-		return err
-	}
-
-	msg := comms.IOMsg{}
-	msg.Data = data
-	msg.Topic = r.settings.CatRequestTopic
-	msg.Retain = false
-	msg.Qos = 0
-
-	r.settings.ToWireCh <- msg
-
-	return nil
-}
-
-func (r *remoteRadio) deserializeCaps(msg []byte) error {
+func (r *RemoteRadio) DeserializeCaps(msg []byte) error {
 
 	caps := sbRadio.Capabilities{}
 	err := caps.Unmarshal(msg)
@@ -177,7 +36,7 @@ func (r *remoteRadio) deserializeCaps(msg []byte) error {
 	return nil
 }
 
-func (r *remoteRadio) deserializeCatResponse(msg []byte) error {
+func (r *RemoteRadio) DeserializeCatResponse(msg []byte) error {
 
 	ns := sbRadio.State{}
 	err := ns.Unmarshal(msg)
@@ -292,10 +151,16 @@ func (r *remoteRadio) deserializeCatResponse(msg []byte) error {
 		}
 	}
 
+	if ns.GetSyncInterval() != r.state.SyncInterval {
+		r.state.SyncInterval = ns.GetSyncInterval()
+		if r.printRigUpdates {
+			r.logger.Printf("Updated rig sync interval: %ds\n", r.state.SyncInterval)
+		}
+	}
 	return nil
 }
 
-func (r *remoteRadio) updateSplit(newSplit *sbRadio.Split) error {
+func (r *RemoteRadio) updateSplit(newSplit *sbRadio.Split) error {
 
 	if newSplit.GetEnabled() != r.state.Vfo.Split.Enabled {
 		r.state.Vfo.Split.Enabled = newSplit.GetEnabled()
@@ -336,7 +201,7 @@ func (r *remoteRadio) updateSplit(newSplit *sbRadio.Split) error {
 	return nil
 }
 
-func (r *remoteRadio) updateFunctions(newFuncs map[string]bool) error {
+func (r *RemoteRadio) updateFunctions(newFuncs map[string]bool) error {
 
 	r.state.Vfo.Functions = newFuncs
 	if r.printRigUpdates {
@@ -346,10 +211,10 @@ func (r *remoteRadio) updateFunctions(newFuncs map[string]bool) error {
 		}
 	}
 
-	// vfo, _ := hl.VfoValue[r.state.CurrentVfo]
+	// vfo, _ := hl.VfoValue[r.State.CurrentVfo]
 
 	// functions to be enabled
-	// diff := utils.SliceDiff(newFuncs, r.state.Vfo.Functions)
+	// diff := utils.SliceDiff(newFuncs, r.State.Vfo.Functions)
 	// for _, f := range diff {
 	// 	funcValue, ok := hl.FuncValue[f]
 	// 	if !ok {
@@ -362,7 +227,7 @@ func (r *remoteRadio) updateFunctions(newFuncs map[string]bool) error {
 	// }
 
 	// // functions to be disabled
-	// diff = utils.SliceDiff(r.state.Vfo.Functions, newFuncs)
+	// diff = utils.SliceDiff(r.State.Vfo.Functions, newFuncs)
 	// for _, f := range diff {
 	// 	funcValue, ok := hl.FuncValue[f]
 	// 	if !ok {
@@ -377,7 +242,7 @@ func (r *remoteRadio) updateFunctions(newFuncs map[string]bool) error {
 	return nil
 }
 
-func (r *remoteRadio) updateLevels(newLevels map[string]float32) error {
+func (r *RemoteRadio) updateLevels(newLevels map[string]float32) error {
 
 	r.state.Vfo.Levels = newLevels
 
@@ -388,18 +253,18 @@ func (r *remoteRadio) updateLevels(newLevels map[string]float32) error {
 		}
 	}
 
-	// vfo, _ := hl.VfoValue[r.state.CurrentVfo]
+	// vfo, _ := hl.VfoValue[r.State.CurrentVfo]
 
 	// for k, v := range newLevels {
 	// 	levelValue, ok := hl.LevelValue[k]
 	// 	if !ok {
 	// 		return errors.New("unknown Level")
 	// 	}
-	// 	if _, ok := r.state.Vfo.Levels[k]; !ok {
+	// 	if _, ok := r.State.Vfo.Levels[k]; !ok {
 	// 		return errors.New("unsupported Level for this rig")
 	// 	}
 
-	// if r.state.Vfo.Levels[k] != v {
+	// if r.State.Vfo.Levels[k] != v {
 	// 	err := r.rig.SetLevel(vfo, levelValue, v)
 	// 	if err != nil {
 	// 		return nil
@@ -410,7 +275,7 @@ func (r *remoteRadio) updateLevels(newLevels map[string]float32) error {
 	return nil
 }
 
-func (r *remoteRadio) updateParams(newParams map[string]float32) error {
+func (r *RemoteRadio) updateParams(newParams map[string]float32) error {
 
 	r.state.Vfo.Parameters = newParams
 
@@ -421,17 +286,17 @@ func (r *remoteRadio) updateParams(newParams map[string]float32) error {
 		}
 	}
 
-	// vfo, _ := hl.VfoValue[r.state.CurrentVfo]
+	// vfo, _ := hl.VfoValue[r.State.CurrentVfo]
 
 	// for k, v := range newParams {
 	// 	paramValue, ok := hl.ParmValue[k]
 	// 	if !ok {
 	// 		return errors.New("unknown Parameter")
 	// 	}
-	// if _, ok := r.state.Vfo.Parameters[k]; !ok {
+	// if _, ok := r.State.Vfo.Parameters[k]; !ok {
 	// 	return errors.New("unsupported Parameter for this rig")
 	// }
-	// if r.state.Vfo.Levels[k] != v {
+	// if r.State.Vfo.Levels[k] != v {
 	// 	err := r.rig.SetLevel(vfo, paramValue, v)
 	// 	if err != nil {
 	// 		return nil
@@ -440,28 +305,4 @@ func (r *remoteRadio) updateParams(newParams map[string]float32) error {
 	// }
 
 	return nil
-}
-
-func (r *remoteRadio) initSetState() sbRadio.SetState {
-	request := sbRadio.SetState{}
-
-	request.CurrentVfo = r.state.CurrentVfo
-	request.Vfo = &sbRadio.Vfo{}
-	request.Vfo.Split = &sbRadio.Split{}
-	request.Md = &sbRadio.MetaData{}
-	request.UserId = r.userID
-
-	return request
-}
-
-func (r *remoteRadio) deserializeRadioLogMsg(ba []byte) {
-
-	radioLogMsg := sbLog.LogMsg{}
-	err := radioLogMsg.Unmarshal(ba)
-	if err != nil {
-		r.logger.Println("could not unmarshal radio log message")
-		return
-	}
-
-	ui.SendCustomEvt("/log/msg", radioLogMsg.Msg)
 }

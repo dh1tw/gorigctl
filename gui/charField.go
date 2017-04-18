@@ -1,4 +1,4 @@
-package cligui
+package gui
 
 import "strings"
 

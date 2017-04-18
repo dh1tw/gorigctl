@@ -1,19 +1,25 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/cskr/pubsub"
-	"github.com/dh1tw/gorigctl/cligui"
+	"github.com/dh1tw/gorigctl/cli"
 	"github.com/dh1tw/gorigctl/comms"
 	"github.com/dh1tw/gorigctl/events"
+	"github.com/dh1tw/gorigctl/gui"
 	"github.com/dh1tw/gorigctl/ping"
-	"github.com/dh1tw/gorigctl/serverstatus"
+	"github.com/dh1tw/gorigctl/remoteradio"
+	sbLog "github.com/dh1tw/gorigctl/sb_log"
 	"github.com/dh1tw/gorigctl/utils"
+	ui "github.com/gizak/termui"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
@@ -43,6 +49,13 @@ func init() {
 	guiMqttCmd.Flags().IntP("broker-port", "p", 1883, "Broker Port")
 	guiMqttCmd.Flags().StringP("station", "X", "mystation", "Your station callsign")
 	guiMqttCmd.Flags().StringP("radio", "Y", "myradio", "Radio ID")
+}
+
+type remoteGui struct {
+	cliCmds       []cli.CliCmd
+	remoteCliCmds []remoteradio.RemoteCliCmd
+	radio         remoteradio.RemoteRadio
+	logger        *log.Logger
 }
 
 func guiCliClient(cmd *cobra.Command, args []string) {
@@ -139,47 +152,157 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 		Logger:                      appLogger,
 	}
 
-	remoteRadioSettings := cligui.RemoteRadioSettings{
-		CatResponseCh:   toDeserializeCatResponseCh,
-		RadioStatusCh:   toDeserializeStatusCh,
-		CapabilitiesCh:  toDeserializeCapsCh,
-		RadioLogCh:      toDeserializeLogCh,
-		ToWireCh:        toWireCh,
-		CatRequestTopic: serverCatRequestTopic,
-		Events:          evPS,
-		WaitGroup:       &wg,
-		UserID:          userID,
-	}
+	wg.Add(2) //MQTT + ping
 
-	serverStatusSettings := serverstatus.Settings{
-		Waitgroup:      &wg,
-		ServerStatusCh: toDeserializeStatusCh,
-		Events:         evPS,
-		Logger:         appLogger,
-	}
-
-	wg.Add(4) //MQTT + ping + cligui + MonitorServerStatus
+	rGui := remoteGui{}
 
 	shutdownCh := evPS.Sub(events.Shutdown)
+	cliInputCh := evPS.Sub(events.CliInput)
+	pongCh := evPS.Sub(events.Pong)
+	radioOnlineCh := evPS.Sub(events.RadioOnline)
+	loggingCh := evPS.Sub(events.AppLog)
+
+	logger := utils.NewChLogger(evPS, events.AppLog, "")
+	rGui.logger = logger
+
+	rGui.radio = remoteradio.NewRemoteRadio(serverCatRequestTopic, userID, toWireCh, logger, evPS)
+	rGui.cliCmds = cli.PopulateCliCmds()
+	rGui.remoteCliCmds = remoteradio.GetRemoteCliCmds()
+	rGui.logger = logger
+
+	if err := ui.Init(); err != nil {
+		panic(err)
+	}
+	defer ui.Close()
 
 	go ping.CheckLatency(pingSettings)
-	go cligui.HandleRemoteRadio(remoteRadioSettings)
-	go serverstatus.MonitorServerStatus(serverStatusSettings)
-	go time.Sleep(200 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 	go comms.MqttClient(mqttSettings)
+	go gui.Loop(evPS)
 
 	for {
 		select {
 		// shutdown the application gracefully
 		case <-shutdownCh:
 			//force exit after 1 sec
+			ui.Close()
 			exitTimeout := time.NewTimer(time.Second)
 			go func() {
 				<-exitTimeout.C
-				os.Exit(0)
+				os.Exit(-1)
 			}()
 			wg.Wait()
 			os.Exit(0)
+		case msg := <-toDeserializeCapsCh:
+			rGui.radio.DeserializeCaps(msg)
+			caps, _ := rGui.radio.GetCaps()
+			ui.SendCustomEvt("/radio/caps", caps)
+
+		case msg := <-toDeserializeCatResponseCh:
+			// r.printRigUpdates = true
+			err := rGui.radio.DeserializeCatResponse(msg)
+			if err != nil {
+				ui.SendCustomEvt("/log/msg", err.Error())
+			}
+			state, _ := rGui.radio.GetState()
+			ui.SendCustomEvt("/radio/state", state)
+
+		case msg := <-toDeserializeStatusCh:
+			rGui.radio.DeserializeRadioStatus(msg)
+
+		case msg := <-cliInputCh:
+			rGui.parseCli(msg.([]string))
+
+		case msg := <-toDeserializeLogCh:
+			deserializeRadioLogMsg(msg)
+
+		case msg := <-loggingCh:
+			// forward to GUI event handler to be shown in the
+			// approriate window
+			ui.SendCustomEvt("/log/msg", msg)
+
+		case msg := <-radioOnlineCh:
+			if msg.(bool) {
+				logger.Println("radio is online")
+			} else {
+				logger.Println("radio is offline")
+			}
+			ui.SendCustomEvt("/radio/status", msg.(bool))
+
+		case msg := <-pongCh:
+			ui.SendCustomEvt("/network/latency", msg)
+
+		case <-shutdownCh:
+			log.Println("disconnecting from radio")
+			return
 		}
+
+	}
+}
+
+func deserializeRadioLogMsg(ba []byte) {
+
+	radioLogMsg := sbLog.LogMsg{}
+	err := radioLogMsg.Unmarshal(ba)
+	if err != nil {
+		fmt.Println("could not unmarshal radio log message")
+		return
+	}
+
+	ui.SendCustomEvt("/log/msg", radioLogMsg.Msg)
+}
+
+func (rGui *remoteGui) parseCli(cliInput []string) {
+
+	found := false
+	for _, cmd := range rGui.cliCmds {
+		if cmd.Name == cliInput[0] || cmd.Shortcut == cliInput[0] {
+			cmd.Cmd(&rGui.radio, rGui.logger, cliInput[1:])
+			found = true
+		}
+	}
+
+	for _, cmd := range rGui.remoteCliCmds {
+		if cmd.Name == cliInput[0] || cmd.Shortcut == cliInput[0] {
+			cmd.Cmd(&rGui.radio, rGui.logger, cliInput[1:])
+			found = true
+		}
+	}
+
+	if cliInput[0] == "help" || cliInput[0] == "?" {
+		rGui.PrintHelp(rGui.logger)
+		found = true
+	}
+
+	if !found {
+		rGui.logger.Println("unknown command")
+	}
+}
+
+func (rGui *remoteGui) PrintHelp(log *log.Logger) {
+
+	buf := bytes.Buffer{}
+
+	table := tablewriter.NewWriter(&buf)
+	table.SetHeader([]string{"Command", "Shortcut", "Parameter"})
+	table.SetCenterSeparator("|")
+	table.SetRowLine(true)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetColWidth(50)
+
+	for _, el := range rGui.cliCmds {
+		table.Append([]string{el.Name, el.Shortcut, el.Parameters})
+	}
+
+	for _, el := range rGui.remoteCliCmds {
+		table.Append([]string{el.Name, el.Shortcut, el.Parameters})
+	}
+
+	table.Render()
+
+	lines := strings.Split(buf.String(), "\n")
+
+	for _, line := range lines {
+		rGui.logger.Println(line)
 	}
 }

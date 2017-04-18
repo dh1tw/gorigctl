@@ -21,7 +21,7 @@ const (
 	OsExit          = "osExit"         // bool
 	AppLog          = "applog"         // string
 	RadioLog        = "radiolog"       // string
-	ServerOnline    = "serverOnline"   //bool
+	RadioOnline     = "radioOnline"    //bool
 	Pong            = "pong"           // int64
 )
 

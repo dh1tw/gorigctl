@@ -69,23 +69,16 @@ func MqttClient(s MqttSettings) {
 	// mqtt.ERROR = log.New(os.Stderr, "ERROR - ", log.LstdFlags)
 
 	shutdownCh := s.Events.Sub(events.Shutdown)
-	// forwardCatRequestCh := s.Events.Sub(events.ForwardCat)
-
-	// forwardCat := false
 
 	var msgHandler mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 
 		if strings.Contains(msg.Topic(), "cat/setstate") {
 
-			// if forwardCat {
 			s.ToDeserializeCatRequestCh <- msg.Payload()[:len(msg.Payload())]
-			// }
 
 		} else if strings.Contains(msg.Topic(), "cat/state") {
 
-			// if forwardCat {
 			s.ToDeserializeCatResponseCh <- msg.Payload()[:len(msg.Payload())]
-			// }
 
 		} else if strings.Contains(msg.Topic(), "cat/caps") {
 

@@ -13,7 +13,7 @@ import (
 	"github.com/dh1tw/gorigctl/comms"
 	"github.com/dh1tw/gorigctl/events"
 	"github.com/dh1tw/gorigctl/ping"
-	"github.com/dh1tw/gorigctl/radio"
+	"github.com/dh1tw/gorigctl/server"
 	"github.com/dh1tw/gorigctl/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -49,7 +49,13 @@ func init() {
 	serverMqttCmd.Flags().StringP("radio", "Y", "myradio", "Radio ID")
 	serverMqttCmd.Flags().DurationP("polling_interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig's meter values [ms] (0 = disabled)")
 	serverMqttCmd.Flags().DurationP("sync_interval", "k", time.Duration(time.Second*3), "Timer for syncing all values with the rig [s] (0 = disabled)")
-
+	serverMqttCmd.Flags().IntP("rig-model", "m", 1, "Hamlib Rig Model ID")
+	serverMqttCmd.Flags().IntP("baudrate", "b", 38400, "Baudrate")
+	serverMqttCmd.Flags().StringP("portname", "o", "/dev/mhux/cat", "Portname (e.g. COM1)")
+	serverMqttCmd.Flags().IntP("databits", "d", 8, "Databits")
+	serverMqttCmd.Flags().IntP("stopbits", "s", 1, "Stopbits")
+	serverMqttCmd.Flags().StringP("parity", "r", "none", "Parity")
+	serverMqttCmd.Flags().StringP("handshake", "a", "none", "Handshake")
 }
 
 func mqttRadioServer(cmd *cobra.Command, args []string) {
@@ -128,7 +134,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		Retain: true,
 	}
 
-	appLogger := utils.NewStdLogger("")
+	appLogger := utils.NewStdLogger("", log.Ltime)
 	radioLogger := utils.NewChLogger(evPS, events.RadioLog, "")
 
 	mqttSettings := comms.MqttSettings{
@@ -185,7 +191,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	pollingInterval := viper.GetDuration("radio.polling_interval")
 	syncInterval := viper.GetDuration("radio.sync_interval")
 
-	radioSettings := radio.RadioSettings{
+	radioSettings := server.RadioSettings{
 		RigModel:         rigModel,
 		Port:             port,
 		HlDebugLevel:     hlDebugLevel,
@@ -215,7 +221,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	go ping.EchoPing(pongSettings)
 
 	time.Sleep(time.Millisecond * 500)
-	go radio.HandleRadio(radioSettings)
+	go server.StartRadioServer(radioSettings)
 
 	status := serverStatus{}
 	status.statusTopic = serverStatusTopic
