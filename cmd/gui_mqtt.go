@@ -185,6 +185,7 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 		// shutdown the application gracefully
 		case <-shutdownCh:
 			//force exit after 1 sec
+			ui.Close()
 			exitTimeout := time.NewTimer(time.Second)
 			go func() {
 				<-exitTimeout.C

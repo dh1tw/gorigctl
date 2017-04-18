@@ -1,4 +1,4 @@
-package radioserver
+package server
 
 import (
 	hl "github.com/dh1tw/goHamlib"

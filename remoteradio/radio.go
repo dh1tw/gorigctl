@@ -261,3 +261,11 @@ func (r *RemoteRadio) sendCatRequest(req sbRadio.SetState) error {
 
 	return nil
 }
+
+func (r *RemoteRadio) IsOnlne() bool {
+	return r.radioOnline
+}
+
+func (r *RemoteRadio) SetOnline(online bool) {
+	r.radioOnline = online
+}

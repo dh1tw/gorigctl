@@ -1,4 +1,4 @@
-package radioserver
+package server
 
 import (
 	"errors"
@@ -147,7 +147,7 @@ func (r *localRadio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasPtt {
 		if ns.GetPtt() != r.state.Ptt {
-			r.radioLogger.Printf("%s requested to set ptt to %v\n", ns.GetUserId(), ns.GetPtt())
+			r.appLogger.Printf("%s requested to set ptt to %v\n", ns.GetUserId(), ns.GetPtt())
 			if err := r.updatePtt(ns.GetPtt()); err != nil {
 				r.radioLogger.Println(err)
 			}
@@ -157,13 +157,13 @@ func (r *localRadio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasPollingInterval {
 		if ns.GetPollingInterval() != r.state.PollingInterval {
 			if ns.GetPollingInterval() > 0 {
-				r.radioLogger.Printf("%s requested to set rig polling interval to %dms\n", ns.GetUserId(), ns.GetPollingInterval())
+				r.appLogger.Printf("%s requested to set rig polling interval to %dms\n", ns.GetUserId(), ns.GetPollingInterval())
 				newPollingInterval := time.Millisecond * time.Duration(ns.GetPollingInterval())
 				r.pollingTicker.Stop()
 				r.pollingTicker = time.NewTicker(newPollingInterval)
 				r.state.PollingInterval = ns.GetPollingInterval()
 			} else {
-				r.radioLogger.Printf("%s requested to stop rig polling\n", ns.GetUserId())
+				r.appLogger.Printf("%s requested to stop rig polling\n", ns.GetUserId())
 				r.pollingTicker.Stop()
 				r.state.PollingInterval = 0
 			}
@@ -173,13 +173,13 @@ func (r *localRadio) deserializeCatRequest(request []byte) error {
 	if ns.Md.HasSyncInterval {
 		if ns.GetSyncInterval() != r.state.SyncInterval {
 			if ns.GetSyncInterval() > 0 {
-				r.radioLogger.Printf("%s requested to set rig sync interval to %ds\n", ns.GetUserId(), ns.GetSyncInterval())
+				r.appLogger.Printf("%s requested to set rig sync interval to %ds\n", ns.GetUserId(), ns.GetSyncInterval())
 				newSyncInterval := time.Second * time.Duration(ns.GetSyncInterval())
 				r.syncTicker.Stop()
 				r.syncTicker = time.NewTicker(newSyncInterval)
 				r.state.SyncInterval = ns.GetSyncInterval()
 			} else {
-				r.radioLogger.Printf("%s requested to stop rig sync\n", ns.GetUserId())
+				r.appLogger.Printf("%s requested to stop rig sync\n", ns.GetUserId())
 				r.syncTicker.Stop()
 				r.state.SyncInterval = 0
 			}

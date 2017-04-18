@@ -124,14 +124,6 @@ func (rg *radioGui) init() {
 	rg.swrMeter.Percent = 0
 	rg.swrMeter.Label = ""
 
-	rg.powerMeter = ui.NewGauge()
-	rg.powerMeter.Percent = 40
-	rg.powerMeter.Height = 3
-	rg.powerMeter.BorderLabel = "Power"
-	rg.powerMeter.BarColor = ui.ColorRed
-	rg.powerMeter.Percent = 0
-	rg.powerMeter.Label = ""
-
 	rg.mode = ui.NewPar("")
 	rg.mode.Height = 3
 	rg.mode.BorderLabel = "Mode"
@@ -212,7 +204,7 @@ func (rg *radioGui) init() {
 		ui.NewRow(
 			ui.NewCol(2, 0, rg.info, rg.latency),
 			ui.NewCol(8, 0, rg.frequency),
-			ui.NewCol(2, 0, rg.powerMeter, rg.swrMeter, rg.sMeter)),
+			ui.NewCol(2, 0, rg.swrMeter, rg.sMeter)),
 		ui.NewRow(
 			ui.NewCol(2, 0, rg.powerOn),
 			ui.NewCol(1, 0, rg.vfo),
@@ -397,10 +389,6 @@ func (rg *radioGui) updateGUI() {
 
 	if swrValue, ok := rg.state.Vfo.Levels["SWR"]; ok {
 		rg.setSwrMeter(ptt, swrValue)
-	}
-
-	if powerValue, ok := rg.state.Vfo.Levels["METER"]; ok {
-		rg.setPowerMeter(ptt, powerValue)
 	}
 
 	if sMeterValue, ok := rg.state.Vfo.Levels["STRENGTH"]; ok {
@@ -625,17 +613,6 @@ func (rg *radioGui) setTxFilter(enabled bool, pbWidth int32) {
 		}
 	}
 	ui.Render(rg.txFilter)
-}
-
-func (rg *radioGui) setPowerMeter(ptt bool, value float32) {
-	if ptt && value > 0 {
-		rg.powerMeter.Percent = int(value * 100)
-		rg.powerMeter.Label = fmt.Sprintf("%v Watt", value)
-	} else {
-		rg.powerMeter.Label = ""
-		rg.powerMeter.Percent = 0
-	}
-	ui.Render(rg.powerMeter)
 }
 
 func (rg *radioGui) setSwrMeter(ptt bool, value float32) {

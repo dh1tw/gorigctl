@@ -42,3 +42,18 @@ func (c *chanLogger) Write(input []byte) (n int, err error) {
 	c.ps.Pub(string(input), c.topic)
 	return len(input), nil
 }
+
+type nullLogger struct {
+}
+
+func NewNullLogger() *log.Logger {
+	l := nullLogger{}
+	logger := log.New(&l, "", 0)
+
+	return logger
+}
+
+func (l *nullLogger) Write(input []byte) (n int, err error) {
+
+	return len(input), nil
+}

@@ -4,16 +4,21 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"sync"
+
 	"github.com/cskr/pubsub"
 	hl "github.com/dh1tw/goHamlib"
 	"github.com/dh1tw/gorigctl/cli"
+	"github.com/dh1tw/gorigctl/comms"
 	"github.com/dh1tw/gorigctl/events"
 	"github.com/dh1tw/gorigctl/gui"
-	"github.com/dh1tw/gorigctl/localradio"
+	"github.com/dh1tw/gorigctl/remoteradio"
+	"github.com/dh1tw/gorigctl/server"
 	"github.com/dh1tw/gorigctl/utils"
 	ui "github.com/gizak/termui"
 	"github.com/olekukonko/tablewriter"
@@ -38,14 +43,24 @@ func init() {
 	guiLocalCmd.Flags().StringP("parity", "r", "none", "Parity")
 	guiLocalCmd.Flags().StringP("handshake", "a", "none", "Handshake")
 	guiLocalCmd.Flags().IntP("hl-debug-level", "D", 0, "Hamlib Debug Level (0=ERROR, 5=TRACE")
+	guiLocalCmd.Flags().DurationP("polling_interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig's meter values [ms] (0 = disabled)")
+	guiLocalCmd.Flags().DurationP("sync_interval", "k", time.Duration(time.Second*3), "Timer for syncing all values with the rig [s] (0 = disabled)")
+
 }
 
 type localGui struct {
-	cliCmds []cli.CliCmd
-	radio   *localradio.LocalRadio
+	cliCmds       []cli.CliCmd
+	remoteCliCmds []remoteradio.RemoteCliCmd
+	radio         remoteradio.RemoteRadio
+	logger        *log.Logger
 }
 
 func runLocalGui(cmd *cobra.Command, args []string) {
+
+	// profiling server can be enabled through a hidden pflag
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6061", nil))
+	}()
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
@@ -59,10 +74,13 @@ func runLocalGui(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("radio.stopbits", cmd.Flags().Lookup("stopbits"))
 	viper.BindPFlag("radio.parity", cmd.Flags().Lookup("parity"))
 	viper.BindPFlag("radio.handshake", cmd.Flags().Lookup("handshake"))
-	viper.BindPFlag("radio.hl-debug-level", cmd.Flags().Lookup("hl-debug-level"))
+	viper.BindPFlag("radio.polling_interval", cmd.Flags().Lookup("polling_interval"))
+	viper.BindPFlag("radio.sync_interval", cmd.Flags().Lookup("sync_interval"))
 
 	rigModel := viper.GetInt("radio.rig-model")
-	debugLevel := viper.GetInt("radio.hl-debug-level")
+	debugLevel := 0 // off
+	pollingInterval := viper.GetDuration("radio.polling_interval")
+	syncInterval := viper.GetDuration("radio.sync_interval")
 
 	port := hl.Port{}
 	port.Baudrate = viper.GetInt("radio.baudrate")
@@ -92,46 +110,58 @@ func runLocalGui(cmd *cobra.Command, args []string) {
 
 	evPS := pubsub.New(10000)
 
-	logger := utils.NewChLogger(evPS, events.AppLog, "")
+	toServerCh := make(chan comms.IOMsg, 1000)
+	toClientCh := make(chan comms.IOMsg, 1000)
+	fromClientCh := make(chan []byte, 1000)
 
-	lr, err := localradio.NewLocalRadio(rigModel, debugLevel, port, logger)
-	if err != nil {
-		fmt.Println("Unable to initialize radio:", err)
-		os.Exit(-1)
-	}
+	logger := utils.NewChLogger(evPS, events.AppLog, "")
+	nullLogger := utils.NewNullLogger()
+
+	userID := ""
+	serverCatRequestTopic := "toServer"
+
+	remRadio := remoteradio.NewRemoteRadio(serverCatRequestTopic, userID, toServerCh, logger, evPS)
 
 	lGui := localGui{
-		radio:   lr,
-		cliCmds: cli.PopulateCliCmds(),
+		radio:         remRadio,
+		cliCmds:       cli.PopulateCliCmds(),
+		remoteCliCmds: remoteradio.GetRemoteCliCmds(),
 	}
+
+	wg := sync.WaitGroup{}
+
+	rs := server.RadioSettings{
+		RigModel:         rigModel,
+		Port:             port,
+		HlDebugLevel:     debugLevel,
+		CatRequestCh:     fromClientCh,
+		CatResponseTopic: "state",
+		ToWireCh:         toClientCh,
+		CapsTopic:        "caps",
+		WaitGroup:        &wg,
+		Events:           evPS,
+		PollingInterval:  pollingInterval,
+		SyncInterval:     syncInterval,
+		RadioLogger:      logger,
+		AppLogger:        nullLogger,
+	}
+
+	wg.Add(1) // radioServer
 
 	// prepareShutdownCh := evPS.Sub(events.PrepareShutdown)
 	shutdownCh := evPS.Sub(events.Shutdown)
 	cliInputCh := evPS.Sub(events.CliInput)
 	loggingCh := evPS.Sub(events.AppLog)
 
-	caps, err := lGui.radio.GetCaps()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
-	}
-
 	if err := ui.Init(); err != nil {
 		panic(err)
 	}
 	defer ui.Close()
 
+	go server.StartRadioServer(rs)
 	go gui.Loop(evPS)
-
-	state, err := lGui.radio.GetState()
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(-1)
-	}
-
+	lGui.radio.SetOnline(true)
 	ui.SendCustomEvt("/radio/status", true)
-	ui.SendCustomEvt("/radio/caps", caps)
-	ui.SendCustomEvt("/radio/state", state)
 
 	for {
 		select {
@@ -139,16 +169,42 @@ func runLocalGui(cmd *cobra.Command, args []string) {
 		case <-shutdownCh:
 			//force exit after 1 sec
 			exitTimeout := time.NewTimer(time.Second)
+			ui.Close()
 			go func() {
 				<-exitTimeout.C
 				os.Exit(-1)
 			}()
 			os.Exit(0)
 
-		// case msg := <-toDeserializeCatResponseCh:
-		// 	// r.printRigUpdates = true
-		// 	state, _ := rGui.radio.GetState()
-		// 	ui.SendCustomEvt("/radio/state", state)
+		case msg := <-toClientCh:
+			ioMsg := comms.IOMsg(msg)
+			switch ioMsg.Topic {
+			case "state":
+				if err := lGui.radio.DeserializeCatResponse(ioMsg.Data); err != nil {
+					ui.SendCustomEvt("/log/msg", err.Error())
+					continue
+				}
+				state, err := lGui.radio.GetState()
+				if err != nil {
+					ui.SendCustomEvt("/log/msg", err.Error())
+					continue
+				}
+				ui.SendCustomEvt("/radio/state", state)
+
+			case "caps":
+				lGui.radio.DeserializeCaps(ioMsg.Data)
+				caps, err := lGui.radio.GetCaps()
+				if err != nil {
+					ui.SendCustomEvt("/log/msg", err.Error())
+					continue
+				}
+				ui.SendCustomEvt("/radio/caps", caps)
+			}
+		case msg := <-toServerCh:
+			ioMsg := comms.IOMsg(msg)
+			if ioMsg.Topic == "toServer" {
+				fromClientCh <- ioMsg.Data
+			}
 
 		case msg := <-cliInputCh:
 			lGui.parseCli(logger, msg.([]string))
@@ -166,7 +222,7 @@ func runLocalGui(cmd *cobra.Command, args []string) {
 
 }
 
-func (lcli *localGui) parseCli(logger *log.Logger, cliInput []string) {
+func (lGui *localGui) parseCli(logger *log.Logger, cliInput []string) {
 
 	found := false
 
@@ -174,15 +230,22 @@ func (lcli *localGui) parseCli(logger *log.Logger, cliInput []string) {
 		return
 	}
 
-	for _, cmd := range lcli.cliCmds {
+	for _, cmd := range lGui.cliCmds {
 		if cmd.Name == cliInput[0] || cmd.Shortcut == cliInput[0] {
-			cmd.Cmd(lcli.radio, logger, cliInput[1:])
+			cmd.Cmd(&lGui.radio, logger, cliInput[1:])
+			found = true
+		}
+	}
+
+	for _, cmd := range lGui.remoteCliCmds {
+		if cmd.Name == cliInput[0] || cmd.Shortcut == cliInput[0] {
+			cmd.Cmd(&lGui.radio, logger, cliInput[1:])
 			found = true
 		}
 	}
 
 	if cliInput[0] == "help" || cliInput[0] == "?" {
-		lcli.PrintHelp(logger)
+		lGui.printHelp(logger)
 		found = true
 	}
 
@@ -191,7 +254,7 @@ func (lcli *localGui) parseCli(logger *log.Logger, cliInput []string) {
 	}
 }
 
-func (lGui *localGui) PrintHelp(log *log.Logger) {
+func (lGui *localGui) printHelp(log *log.Logger) {
 
 	buf := bytes.Buffer{}
 
@@ -203,6 +266,10 @@ func (lGui *localGui) PrintHelp(log *log.Logger) {
 	table.SetColWidth(50)
 
 	for _, el := range lGui.cliCmds {
+		table.Append([]string{el.Name, el.Shortcut, el.Parameters})
+	}
+
+	for _, el := range lGui.remoteCliCmds {
 		table.Append([]string{el.Name, el.Shortcut, el.Parameters})
 	}
 

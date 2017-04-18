@@ -17,11 +17,12 @@ func NewLocalRadio(rigModel, debugLevel int, port hl.Port, log *log.Logger) (*Lo
 	lr.rig = hl.Rig{}
 	lr.log = log
 	lr.vfo = hl.RIG_VFO_CURR
+
+	lr.rig.SetDebugLevel(debugLevel)
+
 	if err := lr.rig.Init(rigModel); err != nil {
 		return nil, err
 	}
-
-	lr.rig.SetDebugLevel(debugLevel)
 
 	if err := lr.rig.SetPort(port); err != nil {
 		return nil, err
