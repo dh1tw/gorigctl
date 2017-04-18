@@ -1,0 +1,45 @@
+language: go
+dist: trusty
+sudo: true
+matrix:
+  include:
+  - os: linux
+    env:
+    - GIMME_OS=linux
+    - GIMME_ARCH=amd64
+    go: 1.8
+  - os: osx
+    env:
+    - GIMME_OS=darwin
+    - GIMME_ARCH=amd64
+    go: 1.8
+cache:
+  directories:
+  - "$HOME/protobuf"
+addons:
+  apt:
+    packages:
+    - pkg-config
+    - libhamlib2
+    - libhamlib-dev
+    - autoconf automake libtool curl make g++ unzip
+before_install:
+- git fetch --tags
+install:
+- "./ci/install-deps-linux-osx.sh"
+- export PATH=$PATH:$HOME/protobuf/bin
+script:
+- make dist
+before_deploy:
+- tar -cvzf gorigctl-v$TRAVIS_TAG-$GIMME_OS-$GIMME_ARCH.tar.gz gorigctl
+deploy:
+  provider: releases
+  api_key:
+    secure: QyrMJYYivD+K4r4nfmj5XmwO1Yxmz2rw1tte35omD+5ARAcV/sN4zjnuSnaTkPo0qh2A+AEQHFX6o4ukLRIGa8YAfvwWXVF3q5hFh+nBpvZ3/S0EtS2ovsYud8K+jbL3cmuujiwSwO6x8ATTD+zA6zhkimBOy5w9y1wL8crkspPb/Y8mHnmJZLDuR8baO4IuexreUBd+1toiD9ltZlPr0qxt6J8esfXBks7cOK9Yck+zr26B3edD4w46ov361IpCg2fO+Y89yQ0VNr0fAtvkleajSp/cXIcNGQ9k5gGDoV04q7pBvuwRgHhm7Wn/UCqVIwNVwlgPPfJ6Mx1EdPElwIGwGU/1d+XFhRk+kW9R2+V3JvY28ODiiabggcn+ERYYCSu9jBycA1HcvsaxgnAiAvpWwwBvD6RTrQCEiMW+QLabAbfXh4oc75ws2RNrw2nbRBr/rQI9JtsAHhNQpjiwtVlNTw5D10kAqhsDXfueaXgelJxNaa6R/VDqFnKJtlP8YdIJVWYtYkJttF2+I/s+mXNj0QCF5oLVKJkj8P/BBkC1NFSkdvprjk6VpEPiCZGifpEv9gy2kA4AItKLJ2gAWWGsTfKKrN2oJ8Qe2UGg0qVIPrbnV+VeNt3igT7IDXgN4OBLsuEKDpvneU58HW7Eu21hWxbgbyQub4V2V/A0+x0=
+  file: gorigctl-v$TRAVIS_TAG-$GIMME_OS-$GIMME_ARCH.tar.gz
+  on:
+    repo: dh1tw/gorigctl
+    tags: true
+    draft: true
+    go: 1.8
+
