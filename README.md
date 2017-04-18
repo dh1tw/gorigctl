@@ -40,8 +40,8 @@ and the following operating Systems:
 
 - Linux (Ubuntu, Raspian, Armbian)
 - MacOS (Sierra)
-- Windows (10)
 
+Windows should be supported in the future.
 ## Download
 
 You can download a tarball / zip archive with the compiled binary for MacOS,
@@ -55,7 +55,6 @@ gorigctl depends on hamlib as a 3rd party library. You can either install hamlib
 on Linux and MacOS through their packet managers or
 [build hamlib from source]() for
 the latest updates and new rigs.
-For Windows, the Hamlib library is included in the zip archive.
 
 ### Linux (Ubuntu >= 14.04)
 
