@@ -1,0 +1,24 @@
+[general]
+user_id = "mycallsign"
+
+[mqtt]
+broker_url = "test.mosquitto.org"
+broker_port = 1883
+station = "remoteStation"
+radio = "ft2000"
+
+[radio]
+rig-model = 1 #Dummy
+#rig-model = 128 #FT-950
+#rig-model = 228 #TS-480
+#rig-model = 123 #TS-879
+#rig-model = 122 #FT-857
+baudrate = 38400
+portname = "/dev/mhuxd/cat"
+databits = 8
+stopbits = 1
+parity = "none"
+handshake = "none"
+hl-debug-level = 1
+polling_interval = "200ms"
+sync_interval = "3s"
