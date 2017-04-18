@@ -44,7 +44,7 @@ func (r *LocalRadio) GetCaps() (sbRadio.Capabilities, error) {
 }
 
 func (r *LocalRadio) GetState() (sbRadio.State, error) {
-	return sbRadio.State{}, nil
+	return r.queryVfo()
 }
 
 func (r *LocalRadio) GetFrequency() (float64, error) {
@@ -399,4 +399,147 @@ func (r *LocalRadio) SetParameter(parm string, value float32) error {
 		return errors.New("unknown parameter")
 	}
 	return r.rig.SetParm(r.vfo, p, value)
+}
+
+func (r *LocalRadio) queryVfo() (sbRadio.State, error) {
+
+	state := sbRadio.State{}
+	state.Vfo = &sbRadio.Vfo{}
+	state.Vfo.Levels = make(map[string]float32)
+	state.Vfo.Parameters = make(map[string]float32)
+	state.Vfo.Functions = make(map[string]bool)
+	state.Vfo.Split = &sbRadio.Split{}
+	state.Channel = &sbRadio.Channel{}
+
+	if r.rig.Caps.HasGetPowerStat {
+		pwrOn, err := r.rig.GetPowerStat()
+		if err != nil {
+			return state, err
+		}
+		if pwrOn == hl.RIG_POWER_ON {
+			state.RadioOn = true
+		} else {
+			state.RadioOn = false
+		}
+	}
+
+	// Only query radio if Power is On or if Radio has now PowerStat function
+	// in this case we will assume that the radio is turned on
+	if (r.rig.Caps.HasGetPowerStat && state.RadioOn) || !r.rig.Caps.HasGetPowerStat {
+
+		vfo := hl.VfoValue["CURR"]
+
+		if r.rig.Caps.HasGetVfo {
+			vfo, err := r.GetVfo()
+			if err != nil {
+				return state, err
+			}
+			state.CurrentVfo = vfo
+		} else {
+			state.CurrentVfo = "CURR"
+		}
+
+		if r.rig.Caps.HasGetFreq {
+			freq, err := r.GetFrequency()
+			if err != nil {
+				return state, err
+			}
+			state.Vfo.Frequency = freq
+		}
+
+		if r.rig.Caps.HasGetMode {
+			mode, pbWidth, err := r.GetMode()
+			if err != nil {
+				return state, err
+			}
+			state.Vfo.Mode = mode
+			state.Vfo.PbWidth = int32(pbWidth)
+		}
+
+		if r.rig.Caps.HasGetAnt {
+			ant, err := r.GetAntenna()
+			if err != nil {
+				return state, err
+			}
+			state.Vfo.Ant = int32(ant)
+		}
+
+		if r.rig.Caps.HasGetRit {
+			rit, err := r.rig.GetRit(vfo)
+			if err != nil {
+				return state, err
+			} else {
+				state.Vfo.Rit = int32(rit)
+			}
+		}
+
+		if r.rig.Caps.HasGetRit {
+			xit, err := r.rig.GetXit(vfo)
+			if err != nil {
+				return state, err
+			}
+			state.Vfo.Xit = int32(xit)
+		}
+
+		if r.rig.Caps.HasGetSplitVfo {
+			txVfo, splitOn, err := r.GetSplitVfo()
+			if err != nil {
+				return state, err
+			}
+
+			state.Vfo.Split.Enabled = splitOn
+			state.Vfo.Split.Vfo = txVfo
+
+			if splitOn {
+
+				// these checks should be enabled, but most of the
+				// backends don't have these functions implemented
+				// therefore they use the emulated functions which
+				// unfortunately don't work everywhere well (e.g. TS-480)
+				// if r.rig.Caps.HasGetSplitFreq {
+				txFreq, txMode, txPbWidth, err := r.GetSplitFrequencyMode()
+				if err != nil {
+					return state, err
+				}
+				state.Vfo.Split.Frequency = txFreq
+				state.Vfo.Split.Mode = txMode
+				state.Vfo.Split.PbWidth = int32(txPbWidth)
+			}
+		}
+
+		if r.rig.Caps.HasGetTs {
+			tStep, err := r.rig.GetTs(vfo)
+			if err != nil {
+				return state, err
+			}
+			state.Vfo.TuningStep = int32(tStep)
+
+		}
+
+		for _, f := range r.rig.Caps.GetFunctions {
+			fValue, err := r.GetFunction(f)
+			if err != nil {
+				return state, err
+			}
+			state.Vfo.Functions[f] = fValue
+		}
+
+		for _, level := range r.rig.Caps.GetLevels {
+			lValue, err := r.GetLevel(level.Name)
+			if err != nil {
+				return state, err
+			}
+			state.Vfo.Levels[level.Name] = lValue
+		}
+
+		for _, param := range r.rig.Caps.GetParameters {
+			pValue, err := r.GetParameter(param.Name)
+			if err != nil {
+				return state, err
+			}
+			state.Vfo.Parameters[param.Name] = pValue
+		}
+	}
+
+	return state, nil
 }

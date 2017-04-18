@@ -1227,7 +1227,7 @@ var stateTmpl = template.Must(template.New("").Parse(
 Current Vfo: {{.CurrentVfo}}
   Frequency: {{.Vfo.Frequency}}Hz
   Mode: {{.Vfo.Mode}}
-  PBWidth: {{.Vfo.PbWidth}}
+  PbWidth: {{.Vfo.PbWidth}}
   Antenna: {{.Vfo.Ant}}
   Rit: {{.Vfo.Rit}}
   Xit: {{.Vfo.Xit}}
@@ -1238,7 +1238,8 @@ Current Vfo: {{.CurrentVfo}}
     Mode: {{.Vfo.Split.Mode}}
     PbWidth: {{.Vfo.Split.PbWidth}}
   Tuning Step: {{.Vfo.TuningStep}}
-  Functions: {{range $f := .Vfo.Functions}}{{$f}} {{end}}
+  Functions: {{range $name, $val := .Vfo.Functions}}
+    {{$name}}: {{$val}} {{end}}
   Levels: {{range $name, $val := .Vfo.Levels}}
     {{$name}}: {{$val}} {{end}}
   Parameters: {{range $name, $val := .Vfo.Parameters}}
