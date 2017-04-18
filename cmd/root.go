@@ -23,7 +23,7 @@ gorigctl provides also a server (daemon) which makes the radio available on the
 network.
 
 The user experience depends heavily on the hamlib implementations for each 
-particular radio. Radios with a 'stable' backend provide the best user experience."
+particular radio. Radios with a 'stable' backend provide the best user experience.
 `,
 }
 
