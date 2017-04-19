@@ -1,5 +1,6 @@
 #!/bin/bash
 
+env GOOS=$GIMME_OS GOARCH=$GIMME_ARCH go get github.com/golang/protobuf/proto
 env GOOS=$GIMME_OS GOARCH=$GIMME_ARCH go get github.com/gogo/protobuf/protoc-gen-gofast
 env GOOS=$GIMME_OS GOARCH=$GIMME_ARCH go get -d ./...
 
