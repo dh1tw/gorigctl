@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"sync"
 
@@ -70,21 +69,23 @@ func StartRadioServer(rs RadioSettings) {
 
 	err := r.rig.Init(rs.RigModel)
 	if err != nil {
-		r.radioLogger.Println(err)
+		log.Println(err)
 		return
 	}
 
-	err = r.rig.SetPort(rs.Port)
-	if err != nil {
-		// if we can not set the port, we shut down
-		r.radioLogger.Println(err)
-		r.settings.Events.Pub(true, events.Shutdown)
-		return
+	if rs.RigModel != 1 {
+		err = r.rig.SetPort(rs.Port)
+		if err != nil {
+			// if we can not set the port, we shut down
+			log.Println(err)
+			r.settings.Events.Pub(true, events.Shutdown)
+			return
+		}
 	}
 
 	if err := r.rig.Open(); err != nil {
 		// if we can not open the port, we shut down
-		r.radioLogger.Println(err)
+		log.Println(err)
 		r.settings.Events.Pub(true, events.Shutdown)
 		return
 	}
@@ -95,7 +96,7 @@ func StartRadioServer(rs RadioSettings) {
 	}
 
 	if err := r.queryVfo(); err != nil {
-		fmt.Println(err)
+		r.radioLogger.Println(err)
 	}
 
 	// publish the radio's state

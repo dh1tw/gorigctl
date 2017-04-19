@@ -24,8 +24,10 @@ func NewLocalRadio(rigModel, debugLevel int, port hl.Port, log *log.Logger) (*Lo
 		return nil, err
 	}
 
-	if err := lr.rig.SetPort(port); err != nil {
-		return nil, err
+	if rigModel != 1 { // Dummy shouldn't have a port
+		if err := lr.rig.SetPort(port); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := lr.rig.Open(); err != nil {
