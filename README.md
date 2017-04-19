@@ -149,6 +149,13 @@ $ gorigctl cli local
 The [Wiki](https://github.com/dh1tw/gorigctl/wiki) contains detailed
 instructions on how to build remoteAudio from source code on Linux, MacOS and Windows.
 
+
+## Known issues
+
+- Running "gorigctl gui local" on an embedded device like the raspberry is lacking
+  performance. An alternative is to launch a server and a client is seperate
+  terminals / sessions.
+
 ## Troubleshooting
 
 Feel free to open an [issue](https://github.com/dh1tw/gorigctl/issues) if you
