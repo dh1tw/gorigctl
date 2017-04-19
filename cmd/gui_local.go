@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -35,14 +34,13 @@ var guiLocalCmd = &cobra.Command{
 
 func init() {
 	guiCmd.AddCommand(guiLocalCmd)
-	guiLocalCmd.Flags().IntP("rig-model", "m", 0, "Hamlib Rig Model ID")
+	guiLocalCmd.Flags().IntP("rig-model", "m", 1, "Hamlib Rig Model ID")
 	guiLocalCmd.Flags().IntP("baudrate", "b", 38400, "Baudrate")
 	guiLocalCmd.Flags().StringP("portname", "o", "/dev/mhux/cat", "Portname (e.g. COM1)")
 	guiLocalCmd.Flags().IntP("databits", "d", 8, "Databits")
 	guiLocalCmd.Flags().IntP("stopbits", "s", 1, "Stopbits")
 	guiLocalCmd.Flags().StringP("parity", "r", "none", "Parity")
 	guiLocalCmd.Flags().StringP("handshake", "a", "none", "Handshake")
-	guiLocalCmd.Flags().IntP("hl-debug-level", "D", 0, "Hamlib Debug Level (0=ERROR, 5=TRACE")
 	guiLocalCmd.Flags().DurationP("polling_interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig's meter values [ms] (0 = disabled)")
 	guiLocalCmd.Flags().DurationP("sync_interval", "k", time.Duration(time.Second*3), "Timer for syncing all values with the rig [s] (0 = disabled)")
 
@@ -58,9 +56,9 @@ type localGui struct {
 func runLocalGui(cmd *cobra.Command, args []string) {
 
 	// profiling server can be enabled through a hidden pflag
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6061", nil))
-	}()
+	// go func() {
+	// 	log.Println(http.ListenAndServe("localhost:6061", nil))
+	// }()
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
@@ -153,12 +151,17 @@ func runLocalGui(cmd *cobra.Command, args []string) {
 	cliInputCh := evPS.Sub(events.CliInput)
 	loggingCh := evPS.Sub(events.AppLog)
 
+	go server.StartRadioServer(rs)
+
+	// give a few milliseconds to check if radio
+	// produces an error before we initialize the gui
+	time.Sleep(time.Millisecond * 300)
+
 	if err := ui.Init(); err != nil {
 		panic(err)
 	}
 	defer ui.Close()
 
-	go server.StartRadioServer(rs)
 	go gui.Loop(evPS)
 	lGui.radio.SetOnline(true)
 	ui.SendCustomEvt("/radio/status", true)

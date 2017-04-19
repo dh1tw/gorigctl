@@ -22,9 +22,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"net/http"
-	_ "net/http/pprof"
+	// _ "net/http/pprof"
 )
 
 // mqttCmd represents the mqtt command
@@ -61,9 +59,9 @@ type remoteGui struct {
 func guiCliClient(cmd *cobra.Command, args []string) {
 
 	// profiling server can be enabled through a hidden pflag
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6061", nil))
-	}()
+	// go func() {
+	// 	log.Println(http.ListenAndServe("localhost:6061", nil))
+	// }()
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

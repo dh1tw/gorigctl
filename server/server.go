@@ -74,17 +74,20 @@ func StartRadioServer(rs RadioSettings) {
 		return
 	}
 
-	err = r.rig.SetPort(rs.Port)
-	if err != nil {
-		// if we can not set the port, we shut down
-		r.radioLogger.Println(err)
-		r.settings.Events.Pub(true, events.Shutdown)
-		return
+	// only set port if it's not the Dummy Model
+	if rs.RigModel != 1 {
+		err = r.rig.SetPort(rs.Port)
+		if err != nil {
+			// if we can not set the port, we shut down
+			log.Println(err)
+			r.settings.Events.Pub(true, events.Shutdown)
+			return
+		}
 	}
 
 	if err := r.rig.Open(); err != nil {
 		// if we can not open the port, we shut down
-		r.radioLogger.Println(err)
+		log.Println(err)
 		r.settings.Events.Pub(true, events.Shutdown)
 		return
 	}

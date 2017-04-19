@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -80,9 +79,9 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	}
 
 	// profiling server can be enabled through a hidden pflag
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	// go func() {
+	// 	log.Println(http.ListenAndServe("localhost:6060", nil))
+	// }()
 
 	// viper settings need to be copied in local variables
 	// since viper lookups allocate of each lookup a copy
