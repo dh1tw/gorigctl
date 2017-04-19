@@ -1,0 +1,3 @@
+[submodule "icd"]
+	path = icd
+	url = https://github.com/shackbus/message-icds.git
