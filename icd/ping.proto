@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package shackbus.ping;
-
-message Ping{
-  string user_id = 1;
-  int64 timestamp = 2;
-}

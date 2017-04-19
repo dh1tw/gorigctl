@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package shackbus.status;
-
-message Status{
-    bool online = 1;
-}
