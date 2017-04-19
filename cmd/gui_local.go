@@ -253,7 +253,7 @@ func (lGui *localGui) parseCli(logger *log.Logger, cliInput []string) {
 	}
 
 	if !found {
-		log.Println("unknown command")
+		logger.Println("unknown command")
 	}
 }
 
