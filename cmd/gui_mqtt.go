@@ -139,7 +139,7 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 		ClientID:   mqttClientID,
 		Topics:     mqttRxTopics,
 		ToDeserializeCatResponseCh:  toDeserializeCatResponseCh,
-		ToDeserializeCatRequestCh:   toDeserializePingResponseCh,
+		ToDeserializeCatRequestCh:   toDeserializePingResponseCh, //!!!!!!
 		ToDeserializeCapabilitiesCh: toDeserializeCapsCh,
 		ToDeserializeStatusCh:       toDeserializeStatusCh,
 		ToDeserializePingResponseCh: toDeserializePingResponseCh,

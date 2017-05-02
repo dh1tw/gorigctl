@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"sync"
 
@@ -98,7 +97,7 @@ func StartRadioServer(rs RadioSettings) {
 	}
 
 	if err := r.queryVfo(); err != nil {
-		fmt.Println(err)
+		r.radioLogger.Println(err)
 	}
 
 	// publish the radio's state

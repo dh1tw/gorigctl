@@ -249,6 +249,8 @@ func (r *localRadio) execVfoOperations(vfoOps []string) error {
 			utils.StringInSlice("TOGGLE", vfoOps) ||
 			utils.StringInSlice("FROM_VFO", vfoOps) ||
 			utils.StringInSlice("TO_VFO", vfoOps) ||
+			utils.StringInSlice("BAND_UP", vfoOps) ||
+			utils.StringInSlice("BAND_DOWN", vfoOps) ||
 			utils.StringInSlice("MCL", vfoOps) {
 
 			if err := r.queryVfo(); err != nil {
