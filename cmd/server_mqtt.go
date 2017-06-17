@@ -44,17 +44,20 @@ func init() {
 	serverCmd.AddCommand(serverMqttCmd)
 	serverMqttCmd.Flags().StringP("broker-url", "u", "localhost", "Broker URL")
 	serverMqttCmd.Flags().IntP("broker-port", "p", 1883, "Broker Port")
+	serverMqttCmd.Flags().StringP("username", "U", "", "Username")
+	serverMqttCmd.Flags().StringP("password", "P", "", "Password")
 	serverMqttCmd.Flags().StringP("station", "X", "mystation", "Your station callsign")
 	serverMqttCmd.Flags().StringP("radio", "Y", "myradio", "Radio ID")
-	serverMqttCmd.Flags().DurationP("polling_interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig's meter values [ms] (0 = disabled)")
-	serverMqttCmd.Flags().DurationP("sync_interval", "k", time.Duration(time.Second*3), "Timer for syncing all values with the rig [s] (0 = disabled)")
+	serverMqttCmd.Flags().DurationP("polling-interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig's meter values [ms] (0 = disabled)")
+	serverMqttCmd.Flags().DurationP("sync-interval", "k", time.Duration(time.Second*3), "Timer for syncing all values with the rig [s] (0 = disabled)")
 	serverMqttCmd.Flags().IntP("rig-model", "m", 1, "Hamlib Rig Model ID")
 	serverMqttCmd.Flags().IntP("baudrate", "b", 38400, "Baudrate")
-	serverMqttCmd.Flags().StringP("portname", "o", "/dev/mhux/cat", "Portname (e.g. COM1)")
+	serverMqttCmd.Flags().StringP("portname", "o", "/dev/mhux/cat", "Portname / Device path")
 	serverMqttCmd.Flags().IntP("databits", "d", 8, "Databits")
 	serverMqttCmd.Flags().IntP("stopbits", "s", 1, "Stopbits")
 	serverMqttCmd.Flags().StringP("parity", "r", "none", "Parity")
 	serverMqttCmd.Flags().StringP("handshake", "a", "none", "Handshake")
+	serverMqttCmd.Flags().IntP("hl-debug-level", "D", 0, "Hamlib Debug Level (0=ERROR,..., 5=TRACE")
 }
 
 func mqttRadioServer(cmd *cobra.Command, args []string) {
@@ -65,18 +68,22 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	}
 
 	// bind the pflags to viper settings
-	viper.BindPFlag("mqtt.broker_url", cmd.Flags().Lookup("broker-url"))
-	viper.BindPFlag("mqtt.broker_port", cmd.Flags().Lookup("broker-port"))
+	viper.BindPFlag("credentials.username", cmd.Flags().Lookup("username"))
+	viper.BindPFlag("credentials.password", cmd.Flags().Lookup("password"))
+	viper.BindPFlag("mqtt.broker-url", cmd.Flags().Lookup("broker-url"))
+	viper.BindPFlag("mqtt.broker-port", cmd.Flags().Lookup("broker-port"))
 	viper.BindPFlag("mqtt.station", cmd.Flags().Lookup("station"))
 	viper.BindPFlag("mqtt.radio", cmd.Flags().Lookup("radio"))
-	viper.BindPFlag("radio.polling_interval", cmd.Flags().Lookup("polling_interval"))
-	viper.BindPFlag("radio.sync_interval", cmd.Flags().Lookup("sync_interval"))
-
-	if viper.IsSet("general.user_id") {
-		viper.Set("general.user_id", utils.RandStringRunes(5))
-	} else {
-		viper.Set("general.user_id", "unknown_"+utils.RandStringRunes(5))
-	}
+	viper.BindPFlag("radio.rig-model", cmd.Flags().Lookup("rig-model"))
+	viper.BindPFlag("radio.baudrate", cmd.Flags().Lookup("baudrate"))
+	viper.BindPFlag("radio.portname", cmd.Flags().Lookup("portname"))
+	viper.BindPFlag("radio.databits", cmd.Flags().Lookup("databits"))
+	viper.BindPFlag("radio.stopbits", cmd.Flags().Lookup("stopbits"))
+	viper.BindPFlag("radio.parity", cmd.Flags().Lookup("parity"))
+	viper.BindPFlag("radio.handshake", cmd.Flags().Lookup("handshake"))
+	viper.BindPFlag("radio.polling-interval", cmd.Flags().Lookup("polling-interval"))
+	viper.BindPFlag("radio.sync-interval", cmd.Flags().Lookup("sync-interval"))
+	viper.BindPFlag("radio.hl-debug-level", cmd.Flags().Lookup("hl-debug-level"))
 
 	// profiling server can be enabled through a hidden pflag
 	// go func() {
@@ -87,9 +94,16 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	// since viper lookups allocate of each lookup a copy
 	// and are quite inperformant
 
-	mqttBrokerURL := viper.GetString("mqtt.broker_url")
-	mqttBrokerPort := viper.GetInt("mqtt.broker_port")
-	mqttClientID := viper.GetString("general.user_id")
+	mqttBrokerURL := viper.GetString("mqtt.broker-url")
+	mqttBrokerPort := viper.GetInt("mqtt.broker-port")
+	mqttUsername := viper.GetString("credentials.username")
+	mqttPassword := viper.GetString("credentials.password")
+
+	mqttClientID := "gorigctl-svr-" + utils.RandStringRunes(5)
+
+	if viper.IsSet("credentials.username") {
+		mqttClientID = viper.GetString("credentials.username") + "-" + mqttClientID
+	}
 
 	hlDebugLevel := viper.GetInt("radio.hl-debug-level")
 
@@ -142,6 +156,8 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		BrokerURL:  mqttBrokerURL,
 		BrokerPort: mqttBrokerPort,
 		ClientID:   mqttClientID,
+		Username:   mqttUsername,
+		Password:   mqttPassword,
 		Topics:     mqttRxTopics,
 		ToDeserializeCatRequestCh:  toDeserializeCatRequestCh,
 		ToDeserializePingRequestCh: toDeserializePingRequestCh,
@@ -187,8 +203,8 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		port.Handshake = hl.NO_HANDSHAKE
 	}
 
-	pollingInterval := viper.GetDuration("radio.polling_interval")
-	syncInterval := viper.GetDuration("radio.sync_interval")
+	pollingInterval := viper.GetDuration("radio.polling-interval")
+	syncInterval := viper.GetDuration("radio.sync-interval")
 
 	radioSettings := server.RadioSettings{
 		RigModel:         rigModel,

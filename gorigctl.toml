@@ -1,9 +1,10 @@
-[general]
-user_id = "mycallsign"
+[credentials]
+username = ""
+password = ""
 
 [mqtt]
-broker_url = "test.mosquitto.org"
-broker_port = 1883
+broker-url = "test.mosquitto.org"
+broker-port = 1883
 station = "remoteStation"
 radio = "ft2000"
 
@@ -20,5 +21,5 @@ stopbits = 1
 parity = "none"
 handshake = "none"
 hl-debug-level = 1
-polling_interval = "200ms"
-sync_interval = "3s"
+polling-interval = "200ms"
+sync-interval = "3s"

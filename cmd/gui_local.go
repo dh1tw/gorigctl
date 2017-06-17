@@ -36,13 +36,13 @@ func init() {
 	guiCmd.AddCommand(guiLocalCmd)
 	guiLocalCmd.Flags().IntP("rig-model", "m", 1, "Hamlib Rig Model ID")
 	guiLocalCmd.Flags().IntP("baudrate", "b", 38400, "Baudrate")
-	guiLocalCmd.Flags().StringP("portname", "o", "/dev/mhux/cat", "Portname (e.g. COM1)")
+	guiLocalCmd.Flags().StringP("portname", "o", "/dev/mhux/cat", "Portname / Device path")
 	guiLocalCmd.Flags().IntP("databits", "d", 8, "Databits")
 	guiLocalCmd.Flags().IntP("stopbits", "s", 1, "Stopbits")
 	guiLocalCmd.Flags().StringP("parity", "r", "none", "Parity")
 	guiLocalCmd.Flags().StringP("handshake", "a", "none", "Handshake")
-	guiLocalCmd.Flags().DurationP("polling_interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig's meter values [ms] (0 = disabled)")
-	guiLocalCmd.Flags().DurationP("sync_interval", "k", time.Duration(time.Second*3), "Timer for syncing all values with the rig [s] (0 = disabled)")
+	guiLocalCmd.Flags().DurationP("polling-interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig's meter values [ms] (0 = disabled)")
+	guiLocalCmd.Flags().DurationP("sync-interval", "k", time.Duration(time.Second*3), "Timer for syncing all values with the rig [s] (0 = disabled)")
 
 }
 
@@ -72,13 +72,13 @@ func runLocalGui(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("radio.stopbits", cmd.Flags().Lookup("stopbits"))
 	viper.BindPFlag("radio.parity", cmd.Flags().Lookup("parity"))
 	viper.BindPFlag("radio.handshake", cmd.Flags().Lookup("handshake"))
-	viper.BindPFlag("radio.polling_interval", cmd.Flags().Lookup("polling_interval"))
-	viper.BindPFlag("radio.sync_interval", cmd.Flags().Lookup("sync_interval"))
+	viper.BindPFlag("radio.polling-interval", cmd.Flags().Lookup("polling-interval"))
+	viper.BindPFlag("radio.sync-interval", cmd.Flags().Lookup("sync-interval"))
 
 	rigModel := viper.GetInt("radio.rig-model")
 	debugLevel := 0 // off
-	pollingInterval := viper.GetDuration("radio.polling_interval")
-	syncInterval := viper.GetDuration("radio.sync_interval")
+	pollingInterval := viper.GetDuration("radio.polling-interval")
+	syncInterval := viper.GetDuration("radio.sync-interval")
 
 	port := hl.Port{}
 	port.Baudrate = viper.GetInt("radio.baudrate")

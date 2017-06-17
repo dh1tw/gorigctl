@@ -45,6 +45,8 @@ func init() {
 	guiCmd.AddCommand(guiMqttCmd)
 	guiMqttCmd.Flags().StringP("broker-url", "u", "localhost", "Broker URL")
 	guiMqttCmd.Flags().IntP("broker-port", "p", 1883, "Broker Port")
+	guiMqttCmd.Flags().StringP("username", "U", "", "Username")
+	guiMqttCmd.Flags().StringP("password", "P", "", "Password")
 	guiMqttCmd.Flags().StringP("station", "X", "mystation", "Your station callsign")
 	guiMqttCmd.Flags().StringP("radio", "Y", "myradio", "Radio ID")
 }
@@ -69,21 +71,26 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 	}
 
 	// bind the pflags to viper settings
-	viper.BindPFlag("mqtt.broker_url", cmd.Flags().Lookup("broker-url"))
-	viper.BindPFlag("mqtt.broker_port", cmd.Flags().Lookup("broker-port"))
+	viper.BindPFlag("mqtt.broker-url", cmd.Flags().Lookup("broker-url"))
+	viper.BindPFlag("mqtt.broker-port", cmd.Flags().Lookup("broker-port"))
 	viper.BindPFlag("mqtt.station", cmd.Flags().Lookup("station"))
 	viper.BindPFlag("mqtt.radio", cmd.Flags().Lookup("radio"))
 
-	userID := "unknown_" + utils.RandStringRunes(5)
-	mqttClientID := "unknown_" + utils.RandStringRunes(5)
+	viper.BindPFlag("credentials.username", cmd.Flags().Lookup("username"))
+	viper.BindPFlag("credentials.password", cmd.Flags().Lookup("password"))
 
-	if viper.IsSet("general.user_id") {
-		userID = viper.GetString("general.user_id")
-		mqttClientID = viper.GetString("general.user_id") + utils.RandStringRunes(5)
+	userID := "gorigctl-gui-" + utils.RandStringRunes(5)
+	mqttClientID := "gorigctl-gui-" + utils.RandStringRunes(5)
+	mqttUsername := viper.GetString("credentials.username")
+	mqttPassword := viper.GetString("credentials.password")
+
+	if viper.IsSet("credentials.username") {
+		userID = viper.GetString("credentials.username")
+		mqttClientID = viper.GetString("credentials.username") + "-" + mqttClientID
 	}
 
-	mqttBrokerURL := viper.GetString("mqtt.broker_url")
-	mqttBrokerPort := viper.GetInt("mqtt.broker_port")
+	mqttBrokerURL := viper.GetString("mqtt.broker-url")
+	mqttBrokerPort := viper.GetInt("mqtt.broker-port")
 
 	baseTopic := viper.GetString("mqtt.station") +
 		"/radios/" + viper.GetString("mqtt.radio") +
@@ -137,6 +144,8 @@ func guiCliClient(cmd *cobra.Command, args []string) {
 		BrokerURL:  mqttBrokerURL,
 		BrokerPort: mqttBrokerPort,
 		ClientID:   mqttClientID,
+		Username:   mqttUsername,
+		Password:   mqttPassword,
 		Topics:     mqttRxTopics,
 		ToDeserializeCatResponseCh:  toDeserializeCatResponseCh,
 		ToDeserializeCatRequestCh:   toDeserializePingResponseCh, //!!!!!!

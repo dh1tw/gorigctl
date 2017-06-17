@@ -32,12 +32,12 @@ func init() {
 	cliCmd.AddCommand(cliLocalCmd)
 	cliLocalCmd.Flags().IntP("rig-model", "m", 1, "Hamlib Rig Model ID")
 	cliLocalCmd.Flags().IntP("baudrate", "b", 38400, "Baudrate")
-	cliLocalCmd.Flags().StringP("portname", "o", "/dev/mhux/cat", "Portname (e.g. COM1)")
+	cliLocalCmd.Flags().StringP("portname", "o", "/dev/mhux/cat", "Portname / Device path")
 	cliLocalCmd.Flags().IntP("databits", "d", 8, "Databits")
 	cliLocalCmd.Flags().IntP("stopbits", "s", 1, "Stopbits")
 	cliLocalCmd.Flags().StringP("parity", "r", "none", "Parity")
 	cliLocalCmd.Flags().StringP("handshake", "a", "none", "Handshake")
-	cliLocalCmd.Flags().IntP("hl-debug-level", "D", 0, "Hamlib Debug Level (0=ERROR, 5=TRACE")
+	cliLocalCmd.Flags().IntP("hl-debug-level", "D", 0, "Hamlib Debug Level (0=ERROR,..., 5=TRACE")
 }
 
 type localCli struct {
