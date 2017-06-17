@@ -119,7 +119,10 @@ func (r *localRadio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasFunctions {
 		if !reflect.DeepEqual(ns.Vfo.GetFunctions(), r.state.Vfo.Functions) {
-			r.appLogger.Printf("%s requested to set one or more functions\n", ns.GetUserId())
+			r.appLogger.Printf("%s requested to set the function(s):\n", ns.GetUserId())
+			for funcName, funcValue := range ns.Vfo.GetFunctions() {
+				r.appLogger.Printf(" - %v: %v", funcName, funcValue)
+			}
 			if err := r.updateFunctions(ns.Vfo.GetFunctions()); err != nil {
 				r.radioLogger.Println(err)
 			}
@@ -128,7 +131,10 @@ func (r *localRadio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasLevels {
 		if !reflect.DeepEqual(ns.Vfo.GetLevels(), r.state.Vfo.Levels) {
-			r.appLogger.Printf("%s requested to set one or more levels\n", ns.GetUserId())
+			r.appLogger.Printf("%s requested to set the level(s):\n", ns.GetUserId())
+			for levelName, levelValue := range ns.Vfo.GetLevels() {
+				r.appLogger.Printf(" - %v: %v", levelName, levelValue)
+			}
 			if err := r.updateLevels(ns.Vfo.GetLevels()); err != nil {
 				r.radioLogger.Println(err)
 			}
@@ -137,7 +143,10 @@ func (r *localRadio) deserializeCatRequest(request []byte) error {
 
 	if ns.Md.HasParameters {
 		if !reflect.DeepEqual(ns.Vfo.GetParameters(), r.state.Vfo.Parameters) {
-			r.appLogger.Printf("%s requested to set one or more parameters\n", ns.GetUserId())
+			r.appLogger.Printf("%s requested to set the parameter(s):\n", ns.GetUserId())
+			for parmName, parmValue := range ns.Vfo.GetParameters() {
+				r.appLogger.Printf(" - %v: %v", parmName, parmValue)
+			}
 			if err := r.updateParams(ns.Vfo.GetParameters()); err != nil {
 				r.radioLogger.Println(err)
 			}
