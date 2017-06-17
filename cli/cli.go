@@ -1197,7 +1197,14 @@ Filters [Hz]: {{range $mode, $pbList := .Filters}}
 Tuning Steps [Hz]: {{range $mode, $tsList := .TuningSteps}}
   {{$mode}}:		{{range $ts := $tsList.Value}}{{$ts}} {{end}} {{end}}
 Preamps: {{range $preamp := .Preamps}}{{$preamp}}dB {{end}}
-Attenuators: {{range $att := .Attenuators}}{{$att}}dB {{end}} 
+Attenuators: {{range $att := .Attenuators}}{{$att}}dB {{end}}
+Has Powerstat: {{.HasPowerstat}}
+Has Ant: {{.HasAnt}}
+Has Rit: {{.HasRit}}
+Has Xit: {{.HasXit}}
+Has Split: {{.HasSplit}}
+Has TuningStep: {{.HasTs}}
+Has Ptt: {{.HasPtt}}
 `,
 ))
 
