@@ -58,7 +58,7 @@ func init() {
 	serverMqttCmd.Flags().IntP("stopbits", "s", 1, "Stopbits")
 	serverMqttCmd.Flags().StringP("parity", "r", "none", "Parity")
 	serverMqttCmd.Flags().StringP("handshake", "a", "none", "Handshake")
-	serverMqttCmd.Flags().IntP("hl-debug-level", "D", 0, "Hamlib Debug Level (0=ERROR,..., 5=TRACE")
+	serverMqttCmd.Flags().IntP("hl-debug-level", "D", 0, "Hamlib Debug Level (0=ERROR,..., 5=TRACE)")
 }
 
 func mqttRadioServer(cmd *cobra.Command, args []string) {

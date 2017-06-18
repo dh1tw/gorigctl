@@ -37,7 +37,7 @@ func init() {
 	cliLocalCmd.Flags().IntP("stopbits", "s", 1, "Stopbits")
 	cliLocalCmd.Flags().StringP("parity", "r", "none", "Parity")
 	cliLocalCmd.Flags().StringP("handshake", "a", "none", "Handshake")
-	cliLocalCmd.Flags().IntP("hl-debug-level", "D", 0, "Hamlib Debug Level (0=ERROR,..., 5=TRACE")
+	cliLocalCmd.Flags().IntP("hl-debug-level", "D", 0, "Hamlib Debug Level (0=ERROR,..., 5=TRACE)")
 }
 
 type localCli struct {
