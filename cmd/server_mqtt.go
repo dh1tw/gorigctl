@@ -42,10 +42,11 @@ The parameters in "<>" can be set through flags or in the config file:
 
 func init() {
 	serverCmd.AddCommand(serverMqttCmd)
-	serverMqttCmd.Flags().StringP("broker-url", "u", "localhost", "Broker URL")
-	serverMqttCmd.Flags().IntP("broker-port", "p", 1883, "Broker Port")
-	serverMqttCmd.Flags().StringP("username", "U", "", "Username")
-	serverMqttCmd.Flags().StringP("password", "P", "", "Password")
+	serverMqttCmd.Flags().StringP("broker-url", "u", "test.mosquitto.org", "MQTT Broker URL")
+	serverMqttCmd.Flags().IntP("broker-port", "p", 1883, "MQTT Broker Port")
+	serverMqttCmd.Flags().StringP("username", "U", "", "MQTT Username")
+	serverMqttCmd.Flags().StringP("password", "P", "", "MQTT Password")
+	serverMqttCmd.Flags().StringP("client-id", "C", "gorigctl-svr", "MQTT ClientID")
 	serverMqttCmd.Flags().StringP("station", "X", "mystation", "Your station callsign")
 	serverMqttCmd.Flags().StringP("radio", "Y", "myradio", "Radio ID")
 	serverMqttCmd.Flags().DurationP("polling-interval", "t", time.Duration(time.Millisecond*100), "Timer for polling the rig's meter values [ms] (0 = disabled)")
@@ -68,8 +69,9 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	}
 
 	// bind the pflags to viper settings
-	viper.BindPFlag("credentials.username", cmd.Flags().Lookup("username"))
-	viper.BindPFlag("credentials.password", cmd.Flags().Lookup("password"))
+	viper.BindPFlag("mqtt.username", cmd.Flags().Lookup("username"))
+	viper.BindPFlag("mqtt.password", cmd.Flags().Lookup("password"))
+	viper.BindPFlag("mqtt.client-id", cmd.Flags().Lookup("client-id"))
 	viper.BindPFlag("mqtt.broker-url", cmd.Flags().Lookup("broker-url"))
 	viper.BindPFlag("mqtt.broker-port", cmd.Flags().Lookup("broker-port"))
 	viper.BindPFlag("mqtt.station", cmd.Flags().Lookup("station"))
@@ -96,13 +98,12 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 
 	mqttBrokerURL := viper.GetString("mqtt.broker-url")
 	mqttBrokerPort := viper.GetInt("mqtt.broker-port")
-	mqttUsername := viper.GetString("credentials.username")
-	mqttPassword := viper.GetString("credentials.password")
+	mqttUsername := viper.GetString("mqtt.username")
+	mqttPassword := viper.GetString("mqtt.password")
+	mqttClientID := viper.GetString("mqtt.client-id")
 
-	mqttClientID := "gorigctl-svr-" + utils.RandStringRunes(5)
-
-	if viper.IsSet("credentials.username") {
-		mqttClientID = viper.GetString("credentials.username") + "-" + mqttClientID
+	if mqttClientID == "gorigctl-svr" {
+		mqttClientID = mqttClientID + "-" + utils.RandStringRunes(5)
 	}
 
 	hlDebugLevel := viper.GetInt("radio.hl-debug-level")

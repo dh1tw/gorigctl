@@ -38,10 +38,11 @@ The parameters in "<>" can be set through flags or in the config file:
 
 func init() {
 	cliCmd.AddCommand(clientMqttCmd)
-	clientMqttCmd.Flags().StringP("broker-url", "u", "localhost", "Broker URL")
-	clientMqttCmd.Flags().IntP("broker-port", "p", 1883, "Broker Port")
-	clientMqttCmd.Flags().StringP("username", "U", "", "Username")
-	clientMqttCmd.Flags().StringP("password", "P", "", "Password")
+	clientMqttCmd.Flags().StringP("broker-url", "u", "test.mosquitto.org", "MQTT Broker URL")
+	clientMqttCmd.Flags().IntP("broker-port", "p", 1883, "MQTT Broker Port")
+	clientMqttCmd.Flags().StringP("username", "U", "", "MQTT Username")
+	clientMqttCmd.Flags().StringP("password", "P", "", "MQTT Password")
+	clientMqttCmd.Flags().StringP("client-id", "C", "gorigctl-cli", "MQTT ClientID")
 	clientMqttCmd.Flags().StringP("station", "X", "mystation", "remote station callsign")
 	clientMqttCmd.Flags().StringP("radio", "Y", "myradio", "Radio ID")
 }
@@ -64,22 +65,19 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 	viper.BindPFlag("mqtt.broker-port", cmd.Flags().Lookup("broker-port"))
 	viper.BindPFlag("mqtt.station", cmd.Flags().Lookup("station"))
 	viper.BindPFlag("mqtt.radio", cmd.Flags().Lookup("radio"))
-
-	viper.BindPFlag("credentials.username", cmd.Flags().Lookup("username"))
-	viper.BindPFlag("credentials.password", cmd.Flags().Lookup("password"))
-
-	userID := "gorigctl-cli-" + utils.RandStringRunes(5)
-	mqttClientID := "gorigctl-cli-" + utils.RandStringRunes(5)
-	mqttUsername := viper.GetString("credentials.username")
-	mqttPassword := viper.GetString("credentials.password")
-
-	if viper.IsSet("credentials.username") {
-		userID = viper.GetString("credentials.username")
-		mqttClientID = viper.GetString("credentials.username") + "-" + mqttClientID
-	}
+	viper.BindPFlag("mqtt.username", cmd.Flags().Lookup("username"))
+	viper.BindPFlag("mqtt.password", cmd.Flags().Lookup("password"))
+	viper.BindPFlag("mqtt.client-id", cmd.Flags().Lookup("client-id"))
 
 	mqttBrokerURL := viper.GetString("mqtt.broker-url")
 	mqttBrokerPort := viper.GetInt("mqtt.broker-port")
+	mqttUsername := viper.GetString("mqtt.username")
+	mqttPassword := viper.GetString("mqtt.password")
+	mqttClientID := viper.GetString("mqtt.client-id")
+
+	if mqttClientID == "gorigctl-cli" {
+		mqttClientID = mqttClientID + "-" + utils.RandStringRunes(5)
+	}
 
 	baseTopic := viper.GetString("mqtt.station") +
 		"/radios/" + viper.GetString("mqtt.radio") +
@@ -137,7 +135,7 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 	radioOnlineCh := evPS.Sub(events.RadioOnline)
 
 	rcli := remoteCli{}
-	rcli.radio = remoteradio.NewRemoteRadio(serverCatRequestTopic, userID, toWireCh, logger, evPS)
+	rcli.radio = remoteradio.NewRemoteRadio(serverCatRequestTopic, mqttClientID, toWireCh, logger, evPS)
 	rcli.cliCmds = cli.PopulateCliCmds()
 	rcli.remoteCliCmds = remoteradio.GetRemoteCliCmds()
 

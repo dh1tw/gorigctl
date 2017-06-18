@@ -1,12 +1,11 @@
-[credentials]
-username = ""
-password = ""
-
 [mqtt]
 broker-url = "test.mosquitto.org"
 broker-port = 1883
 station = "remoteStation"
 radio = "ft2000"
+username = ""
+password = ""
+client-id = "gorigctl-svr"
 
 [radio]
 rig-model = 1 #Dummy
