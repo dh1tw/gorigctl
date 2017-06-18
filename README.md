@@ -109,18 +109,22 @@ Usage:
 
 Flags:
   -b, --baudrate int                Baudrate (default 38400)
-  -p, --broker-port int             Broker Port (default 1883)
-  -u, --broker-url string           Broker URL (default "localhost")
+  -p, --broker-port int             MQTT Broker Port (default 1883)
+  -u, --broker-url string           MQTT Broker URL (default "test.mosquitto.org")
+  -C, --client-id string            MQTT ClientID (default "gorigctl-svr")
   -d, --databits int                Databits (default 8)
   -a, --handshake string            Handshake (default "none")
+  -D, --hl-debug-level int          Hamlib Debug Level (0=ERROR,..., 5=TRACE)
   -r, --parity string               Parity (default "none")
-  -t, --polling_interval duration   Timer for polling the rig's meter values [ms] (0 = disabled) (default 100ms)
-  -o, --portname string             Portname (e.g. COM1) (default "/dev/mhux/cat")
+  -P, --password string             MQTT Password
+  -t, --polling-interval duration   Timer for polling the rig's meter values [ms] (0 = disabled) (default 100ms)
+  -o, --portname string             Portname / Device path (default "/dev/mhux/cat")
   -Y, --radio string                Radio ID (default "myradio")
   -m, --rig-model int               Hamlib Rig Model ID (default 1)
   -X, --station string              Your station callsign (default "mystation")
   -s, --stopbits int                Stopbits (default 1)
-  -k, --sync_interval duration      Timer for syncing all values with the rig [s] (0 = disabled) (default 3s)
+  -k, --sync-interval duration      Timer for syncing all values with the rig [s] (0 = disabled) (default 3s)
+  -U, --username string             MQTT Username
 
 Global Flags:
       --config string   config file (default is $HOME/.gorigctl.[yaml|toml|json])
