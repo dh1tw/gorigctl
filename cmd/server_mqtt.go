@@ -121,13 +121,15 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 	serverCatResponseTopic := baseTopic + "/state"
 	serverCapsTopic := baseTopic + "/caps"
 	serverPongTopic := baseTopic + "/pong"
+	serverCapsReqTopic := baseTopic + "/capsreq"
 
-	mqttRxTopics := []string{serverCatRequestTopic, serverPingTopic}
+	mqttRxTopics := []string{serverCatRequestTopic, serverPingTopic, serverCapsReqTopic}
 
 	toWireCh := make(chan comms.IOMsg, 20)
 	// toSerializeCatDataCh := make(chan comms.IOMsg, 20)
 	toDeserializeCatRequestCh := make(chan []byte, 10)
 	toDeserializePingRequestCh := make(chan []byte, 10)
+	toDeserializeCapsReqCh := make(chan []byte, 10)
 
 	// Event PubSub
 	evPS := pubsub.New(100)
@@ -162,10 +164,11 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		Topics:     mqttRxTopics,
 		ToDeserializeCatRequestCh:  toDeserializeCatRequestCh,
 		ToDeserializePingRequestCh: toDeserializePingRequestCh,
-		ToWire:   toWireCh,
-		Events:   evPS,
-		LastWill: &lastWill,
-		Logger:   appLogger,
+		ToDeserializeCapsReqCh:     toDeserializeCapsReqCh,
+		ToWire:                     toWireCh,
+		Events:                     evPS,
+		LastWill:                   &lastWill,
+		Logger:                     appLogger,
 	}
 
 	pongSettings := ping.Settings{
@@ -212,6 +215,7 @@ func mqttRadioServer(cmd *cobra.Command, args []string) {
 		Port:             port,
 		HlDebugLevel:     hlDebugLevel,
 		CatRequestCh:     toDeserializeCatRequestCh,
+		CapsReqCh:        toDeserializeCapsReqCh,
 		ToWireCh:         toWireCh,
 		CatResponseTopic: serverCatResponseTopic,
 		CapsTopic:        serverCapsTopic,

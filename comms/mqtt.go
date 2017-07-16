@@ -24,6 +24,7 @@ type MqttSettings struct {
 	ToDeserializeCatRequestCh   chan []byte
 	ToDeserializeCatResponseCh  chan []byte
 	ToDeserializeCapabilitiesCh chan []byte
+	ToDeserializeCapsReqCh      chan []byte
 	ToDeserializeStatusCh       chan []byte
 	ToDeserializePingRequestCh  chan []byte
 	ToDeserializePingResponseCh chan []byte
@@ -82,9 +83,13 @@ func MqttClient(s MqttSettings) {
 
 			s.ToDeserializeCatResponseCh <- msg.Payload()[:len(msg.Payload())]
 
-		} else if strings.Contains(msg.Topic(), "cat/caps") {
+		} else if strings.HasSuffix(msg.Topic(), "cat/caps") {
 
 			s.ToDeserializeCapabilitiesCh <- msg.Payload()[:len(msg.Payload())]
+
+		} else if strings.HasSuffix(msg.Topic(), "cat/capsreq") {
+
+			s.ToDeserializeCapsReqCh <- msg.Payload()[:len(msg.Payload())]
 
 		} else if strings.Contains(msg.Topic(), "cat/status") {
 

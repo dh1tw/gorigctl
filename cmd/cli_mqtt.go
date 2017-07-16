@@ -89,6 +89,7 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 	// tx topics
 	serverCatResponseTopic := baseTopic + "/state"
 	serverCapsTopic := baseTopic + "/caps"
+	serverCapsReqTopic := baseTopic + "/capsreq"
 
 	mqttRxTopics := []string{serverCatResponseTopic, serverCapsTopic, serverStatusTopic}
 
@@ -189,6 +190,12 @@ func mqttCliClient(cmd *cobra.Command, args []string) {
 		case ev := <-radioOnlineCh:
 			radioOnline := ev.(bool)
 			if radioOnline {
+				// when the radio is online, request it's capabilities
+				reqCapsMsg := comms.IOMsg{
+					Topic: serverCapsReqTopic,
+					Data:  []byte{'x'},
+				}
+				toWireCh <- reqCapsMsg
 				fmt.Println("radio is online")
 				fmt.Println()
 				fmt.Printf("rig command: ")

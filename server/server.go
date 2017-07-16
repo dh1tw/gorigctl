@@ -19,6 +19,7 @@ type RadioSettings struct {
 	Port             hl.Port
 	HlDebugLevel     int
 	CatRequestCh     chan []byte
+	CapsReqCh        chan []byte
 	ToWireCh         chan comms.IOMsg
 	CatResponseTopic string
 	CapsTopic        string
@@ -125,12 +126,14 @@ func StartRadioServer(rs RadioSettings) {
 			r.sendState()
 			r.lastCmdRecvd = time.Now()
 
+		case <-rs.CapsReqCh:
+			r.sendCaps()
+
 		case <-prepareShutdownCh:
 			r.pollingTicker.Stop()
 			r.syncTicker.Stop()
 			r.sendClearState()
 			time.Sleep(time.Millisecond * 100)
-			r.sendClearCaps()
 
 		case <-shutdownCh:
 			r.appLogger.Println("Disconnecting from Radio")
@@ -345,7 +348,8 @@ func (r *localRadio) sendState() error {
 	if state, err := r.state.Marshal(); err == nil {
 		stateMsg := comms.IOMsg{}
 		stateMsg.Data = state
-		stateMsg.Retain = true
+		// stateMsg.Retain = true
+		stateMsg.Retain = false
 		stateMsg.Topic = r.settings.CatResponseTopic
 		r.settings.ToWireCh <- stateMsg
 	} else {
@@ -360,7 +364,8 @@ func (r *localRadio) sendCaps() error {
 	if caps, err := r.serializeCaps(); err == nil {
 		capsMsg := comms.IOMsg{}
 		capsMsg.Data = caps
-		capsMsg.Retain = true
+		// capsMsg.Retain = true
+		capsMsg.Retain = false
 		capsMsg.Topic = r.settings.CapsTopic
 		r.settings.ToWireCh <- capsMsg
 	} else {
@@ -442,19 +447,6 @@ func (r *localRadio) sendClearState() error {
 	msg.Data = []byte{}
 	msg.Retain = true
 	msg.Topic = r.settings.CatResponseTopic
-	msg.Qos = 0
-
-	r.settings.ToWireCh <- msg
-
-	return nil
-}
-
-func (r *localRadio) sendClearCaps() error {
-
-	msg := comms.IOMsg{}
-	msg.Data = []byte{}
-	msg.Retain = true
-	msg.Topic = r.settings.CapsTopic
 	msg.Qos = 0
 
 	r.settings.ToWireCh <- msg
