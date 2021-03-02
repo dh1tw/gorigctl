@@ -7,13 +7,13 @@ matrix:
     env:
     - GIMME_OS=linux
     - GIMME_ARCH=amd64
-    - GO111MODULES=on
+    - GO111MODULE=on
     go: 1.15
   - os: osx
     env:
     - GIMME_OS=darwin
     - GIMME_ARCH=amd64
-    - GO111MODULES=on
+    - GO111MODULE=on
     go: 1.15
 cache:
   directories:
