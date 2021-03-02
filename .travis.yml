@@ -1,18 +1,20 @@
 language: go
 dist: trusty
 sudo: true
+env:
+  - GO111MODULES=on
 matrix:
   include:
   - os: linux
     env:
     - GIMME_OS=linux
     - GIMME_ARCH=amd64
-    go: 1.11
+    go: 1.15
   - os: osx
     env:
     - GIMME_OS=darwin
     - GIMME_ARCH=amd64
-    go: 1.11
+    go: 1.15
 cache:
   directories:
   - "$HOME/protobuf"
@@ -42,5 +44,5 @@ deploy:
     repo: dh1tw/gorigctl
     tags: true
     draft: true
-    go: 1.11
+    go: 1.15
 
