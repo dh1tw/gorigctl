@@ -1,19 +1,19 @@
 language: go
 dist: trusty
 sudo: true
-env:
-  - GO111MODULES=on
 matrix:
   include:
   - os: linux
     env:
     - GIMME_OS=linux
     - GIMME_ARCH=amd64
+    - GO111MODULES=on
     go: 1.15
   - os: osx
     env:
     - GIMME_OS=darwin
     - GIMME_ARCH=amd64
+    - GO111MODULES=on
     go: 1.15
 cache:
   directories:
