@@ -1,6 +1,6 @@
 # gorigctl
 
-[![Build Status](https://travis-ci.org/dh1tw/gorigctl.svg?branch=master)](https://travis-ci.org/dh1tw/gorigctl)
+[![Build Status](https://travis-ci.com/dh1tw/gorigctl.svg?branch=master)](https://travis-ci.com/dh1tw/gorigctl)
 
 ![Alt text](http://i.imgur.com/V8z68Pm.png "Screenshot gorigctl's cli based GUI")
 

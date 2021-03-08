@@ -1,5 +1,5 @@
 language: go
-dist: trusty
+dist: focal
 sudo: true
 matrix:
   include:
@@ -9,27 +9,30 @@ matrix:
     - GIMME_ARCH=amd64
     - GO111MODULE=on
     go: 1.15
-  - os: osx
-    env:
-    - GIMME_OS=darwin
-    - GIMME_ARCH=amd64
-    - GO111MODULE=on
-    go: 1.15
-cache:
-  directories:
-  - "$HOME/protobuf"
+  # - os: osx
+  #   env:
+  #   - GIMME_OS=darwin
+  #   - GIMME_ARCH=amd64
+  #   - GO111MODULE=on
+  #   go: 1.15
 addons:
   apt:
     packages:
-    - pkg-config
+    - pkg-config make unzip
     - libhamlib2
     - libhamlib-dev
-    - autoconf automake libtool curl make g++ unzip
+    - protobuf-compiler
+    - autoconf automake libtool curl g++
+  homebrew:
+    packages:
+      - pkg-config
+      - hamlib
+      - protobuf
 before_install:
 - git fetch --tags
 install:
-- "./ci/install-deps-linux-osx.sh"
-- export PATH=$PATH:$HOME/protobuf/bin
+- env GOOS=$GIMME_OS GOARCH=$GIMME_ARCH go get github.com/golang/protobuf/proto
+- env GOOS=$GIMME_OS GOARCH=$GIMME_ARCH go get github.com/gogo/protobuf/protoc-gen-gofast
 script:
 - make dist
 before_deploy:
